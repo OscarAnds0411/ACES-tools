@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="validador-aces" default="compile" basedir=".">
+    
+    <!-- Properties -->
+    <property name="src.dir" value="src"/>
+    <property name="bin.dir" value="bin"/>
+    <property name="lib.dir" value="lib"/>
+    <property name="test.dir" value="tests"/>
+    <property name="dist.dir" value="dist"/>
+    <property name="docs.dir" value="docs"/>
+    
+    <property name="project.name" value="validador-aces"/>
+    <property name="project.version" value="1.0.0"/>
+    <property name="main.class" value="com.validador.aces.Launcher"/>
+    
+    <!-- Classpath -->
+    <path id="classpath">
+        <fileset dir="${lib.dir}" includes="*.jar"/>
+    </path>
+    
+    <!-- Target: Clean -->
+    <target name="clean" description="Limpiar archivos compilados">
+        <delete dir="${bin.dir}"/>
+        <delete dir="${dist.dir}"/>
+        <delete dir="${docs.dir}"/>
+        <echo message="Limpieza completada"/>
+    </target>
+    
+    <!-- Target: Compile -->
+    <target name="compile" description="Compilar proyecto">
+        <echo message="Compilando ${project.name} v${project.version}..."/>
+        <mkdir dir="${bin.dir}"/>
+        <javac 
+            srcdir="${src.dir}" 
+            destdir="${bin.dir}"
+            classpathref="classpath"
+            debug="on"
+            debuglevel="lines,vars,source"
+            source="11"
+            target="11"
+            encoding="UTF-8">
+            <include name="**/*.java"/>
+        </javac>
+        <echo message="Compilación completada: ${bin.dir}"/>
+    </target>
+    
+    <!-- Target: Jar -->
+    <target name="jar" depends="compile" description="Empaquetar JAR ejecutable">
+        <echo message="Empaquetando JAR..."/>
+        <mkdir dir="${dist.dir}"/>
+        
+        <!-- Crear manifest -->
+        <manifest file="${bin.dir}/MANIFEST.MF">
+            <attribute name="Manifest-Version" value="1.0"/>
+            <attribute name="Created-By" value="Ant"/>
+            <attribute name="Main-Class" value="${main.class}"/>
+            <attribute name="Class-Path" value="lib/aalto-xml-1.4.0.jar lib/commons-compress-1.28.0.jar lib/commons-io-2.20.0.jar lib/commons-lang3-3.18.0.jar lib/fastexcel-0.20.2.jar lib/fastexcel-reader-0.20.2.jar lib/opczip-1.2.0.jar lib/stax2-api-4.2.2.jar"/>
+            <attribute name="Implementation-Title" value="Validador de Atributos ACES"/>
+            <attribute name="Implementation-Version" value="${project.version}"/>
+            <attribute name="Implementation-Vendor" value="ACES Team"/>
+            <attribute name="Specification-Title" value="Validador ACES"/>
+            <attribute name="Specification-Version" value="${project.version}"/>
+        </manifest>
+        
+        <!-- Empaquetar JAR con manifest -->
+        <jar 
+            destfile="${dist.dir}/${project.name}.jar"
+            manifest="${bin.dir}/MANIFEST.MF">
+            <fileset dir="${bin.dir}">
+                <include name="**/*.class"/>
+                <include name="**/*.properties"/>
+            </fileset>
+        </jar>
+        
+        <!-- Copiar librerías al directorio de distribución -->
+        <copy todir="${dist.dir}/lib">
+            <fileset dir="${lib.dir}" includes="*.jar"/>
+        </copy>
+        
+        <echo message="JAR empaquetado: ${dist.dir}/${project.name}.jar"/>
+    </target>
+    
+    <!-- Target: Run -->
+    <target name="run" depends="jar" description="Ejecutar aplicación">
+        <echo message="Ejecutando ${project.name}..."/>
+        <java 
+            jar="${dist.dir}/${project.name}.jar"
+            fork="true"
+            dir="${dist.dir}">
+        </java>
+    </target>
+    
+    <!-- Target: Javadoc -->
+    <target name="javadoc" description="Generar documentación JavaDoc">
+        <echo message="Generando documentación JavaDoc..."/>
+        <mkdir dir="${docs.dir}"/>
+        <javadoc 
+            sourcepath="${src.dir}"
+            destdir="${docs.dir}"
+            classpathref="classpath"
+            access="protected"
+            windowtitle="Validador de Atributos ACES v${project.version}"
+            doctitle="Validador de Atributos ACES"
+            author="true"
+            version="true"
+            use="true"
+            encoding="UTF-8">
+            <fileset dir="${src.dir}" includes="**/*.java"/>
+            <link href="https://docs.oracle.com/javase/11/docs/api/"/>
+        </javadoc>
+        <echo message="JavaDoc generado en: ${docs.dir}"/>
+    </target>
+    
+    <!-- Target: Test (opcional) -->
+    <target name="test" depends="compile" description="Ejecutar tests unitarios">
+        <echo message="Ejecutando tests..."/>
+        <echo message="Nota: Implementar después de escribir tests"/>
+    </target>
+    
+    <!-- Target: All -->
+    <target name="all" depends="clean,compile,jar,javadoc" description="Ejecutar todos los targets">
+        <echo message="Build completado: ${project.name} v${project.version}"/>
+    </target>
+    
+    <!-- Target: Info -->
+    <target name="info" description="Mostrar información de la compilación">
+        <echo message="========================================="/>
+        <echo message="Proyecto: ${project.name}"/>
+        <echo message="Versión: ${project.version}"/>
+        <echo message="Java Source: 11"/>
+        <echo message="Java Target: 11"/>
+        <echo message="========================================="/>
+        <echo message="Directorios:"/>
+        <echo message="  Fuentes: ${src.dir}"/>
+        <echo message="  Compilado: ${bin.dir}"/>
+        <echo message="  Distribución: ${dist.dir}"/>
+        <echo message="  Documentación: ${docs.dir}"/>
+        <echo message="  Librerías: ${lib.dir}"/>
+        <echo message="========================================="/>
+        <echo message="Targets disponibles:"/>
+        <echo message="  ant compile   - Compilar proyecto"/>
+        <echo message="  ant clean     - Limpiar archivos compilados"/>
+        <echo message="  ant jar       - Empaquetar JAR ejecutable"/>
+        <echo message="  ant run       - Compilar, empaquetar y ejecutar"/>
+        <echo message="  ant javadoc   - Generar documentación"/>
+        <echo message="  ant test      - Ejecutar tests (cuando estén listos)"/>
+        <echo message="  ant all       - Ejecutar clean, compile, jar, javadoc"/>
+        <echo message="  ant info      - Mostrar esta información"/>
+        <echo message="========================================="/>
+    </target>
+
+</project>

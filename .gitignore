@@ -1,0 +1,271 @@
+# ========================================
+# JAVA / ANT BUILD
+# ========================================
+
+# Compilado por Ant
+bin/
+dist/
+docs/
+*.class
+*.jar
+*.war
+*.ear
+
+# Manifest y archivos de build
+MANIFEST.MF
+*.manifest
+
+# Maven (si se usa en el futuro)
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle (si se usa en el futuro)
+.gradle/
+build/
+gradle/
+gradlew
+gradlew.bat
+
+# ========================================
+# IDEs
+# ========================================
+
+# Eclipse
+.classpath
+.project
+.settings/
+*.launch
+.metadata/
+.recommenders/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# NetBeans
+nbproject/
+.nb-gradle/
+*.nbactions
+*.class
+
+# Visual Studio Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# TextMate
+.tm_properties
+
+# vi/vim
+*~
+*.swp
+*.swo
+*#
+
+# ========================================
+# SISTEMA OPERATIVO
+# ========================================
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*.lnk
+ehthumbs.db
+
+# macOS
+.AppleDouble
+.LSOverride
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+.directory
+
+# ========================================
+# ARCHIVOS DE OFFICE / DATOS
+# ========================================
+
+# Excel
+*.xlsx
+*.xls
+~$*.xlsx
+~$*.xls
+.~lock.*.#
+
+# Word
+*.docx
+*.doc
+~$*.docx
+
+# Archivos temporales de Office
+*.tmp
+
+# CSV y datos temporales
+*.csv.bak
+*.tmp.xlsx
+
+# ========================================
+# LOGS Y TEMPORALES
+# ========================================
+
+# Logs
+*.log
+logs/
+log/
+*.out
+
+# Temporales
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+.temp/
+temp/
+tmp/
+
+# ========================================
+# BASE DE DATOS
+# ========================================
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# H2 Database
+*.h2.db
+*.lock.db
+
+# ========================================
+# CONFIGURACION LOCAL
+# ========================================
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Propiedades locales
+local.properties
+application-local.properties
+
+# Configuración específica del usuario
+user.properties
+config.local.properties
+
+# ========================================
+# CREDENCIALES Y SECRETOS
+# ========================================
+
+# Nunca commitear archivos con datos sensibles
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.json
+.ssh/
+.pgp/
+
+# ========================================
+# DEPENDENCIAS
+# ========================================
+
+# Node (si se usa para herramientas de build)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Python (si se usa para scripts)
+__pycache__/
+*.pyc
+.Python
+venv/
+env/
+
+# ========================================
+# CACHE
+# ========================================
+
+# Cache de compilación
+.cache/
+.gradle/cache/
+
+# Cache del SO
+.Spotlight-V100
+.Trashes
+
+# ========================================
+# PROYECTO ESPECÍFICO - VALIDADOR ACES
+# ========================================
+
+# Archivos de salida de validación
+output/
+reports/
+*.report
+*.html
+validation-results/
+
+# Archivos temporales de pruebas
+test-output/
+test-results/
+*.testlog
+
+# Directorios de trabajo temporal
+working/
+temp-data/
+scratch/
+
+# ========================================
+# GIT
+# ========================================
+
+# Evitar commitear cambios locales de gitignore
+!.gitignore
+
+# ========================================
+# NOTAS Y DOCUMENTACIÓN LOCAL
+# ========================================
+
+# Notas personales que no deben versionarse
+NOTES.md
+TODO.md
+local-notes/
+*.scratch
+
+# ========================================
+# ARCHIVOS ESPECÍFICOS A IGNORAR
+# ========================================
+
+# No ignorar esto (build.xml es necesario)
+!build.xml
+
+# No ignorar esto (lib/ tiene dependencias)
+!lib/
+
+# No ignorar manifests de proyecto (pero sí los generados)
+!manifest.txt
+
+# No ignorar scripts de build
+!build.bat
