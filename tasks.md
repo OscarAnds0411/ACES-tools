@@ -133,24 +133,28 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 - **Complejidad**: 2
 - **Prioridad**: required
 
-### TASK-011: Implementar `ExcelApplicationParser`
+### ✅ TASK-011: Implementar `ExcelApplicationParser`
+- **Estado**: COMPLETADO
 - **Descripcion**: Parser para leer datos de aplicacion desde archivos Excel
 - **Criterios de Aceptacion**:
-  - [ ] Clase `ExcelApplicationParser` que extiende `ApplicationParser`
-  - [ ] Leer hoja unica "Applications": filas = vehiculos, columnas 1-7 = metadata, 8-94 = atributos
-  - [ ] Mapeo de columnas 1-7 (Make, Model, Year, Product, PartNumber, MfrLabel, Position) a campos de Application
-  - [ ] Mapeo de columnas 8-94 al Map de atributos tecnicos
-  - [ ] Manejo de celdas vacias y excepciones de archivo corrupto
+  - [x] Clase `ExcelApplicationParser` que extiende `ApplicationParser`
+  - [x] Leer hoja unica "Applications" en streaming (openStream): filas = vehiculos, columnas 0-6 = metadata, 7+ = atributos
+  - [x] Mapeo de columnas 0-6 (Make, Model, Year, Product, PartNumber, MfrLabel, Position) a campos de Application
+  - [x] Mapeo de columnas 7+ al Map de atributos tecnicos (valores vacios preservados como null, relevante para deteccion de faltantes)
+  - [x] Manejo de celdas vacias y excepciones de archivo corrupto (IOException y RuntimeException envueltas en ParseException)
+  - [x] Verificado contra archivo real: 81,886 Applications parseadas, ~0.9s
 - **Dependencias**: TASK-010
 - **Complejidad**: 3
 - **Prioridad**: required
 
-### TASK-012: Crear `ValidationSchema`
+### ✅ TASK-012: Crear `ValidationSchema`
+- **Estado**: COMPLETADO
 - **Descripcion**: Implementar clase que encapsula esquema de validacion por producto
 - **Criterios de Aceptacion**:
-  - [ ] Clase `ValidationSchema` con propiedades: productLine, requiredAttributes, optionalAttributes
-  - [ ] Metodo para compilar reglas desde ProductLine.attributes (filtrando por AttributeRequirement)
-  - [ ] Metodo para validar que una Application satisface los atributos requeridos
+  - [x] Clase `ValidationSchema` con propiedades: productLine, requiredAttributes, optionalAttributes (en com.validador.aces.validation)
+  - [x] Metodo para compilar reglas desde ProductLine.attributes (filtrando por isRequired/isOptional), compilado una sola vez en el constructor
+  - [x] Metodo findMissingRequiredAttributes(Application) e isSatisfiedBy(Application) para validar atributos requeridos
+  - [x] Verificado end-to-end: deteccion de atributo requerido faltante confirmada forzando un valor vacio en EngineLiters de una Application real
 - **Dependencias**: TASK-003
 - **Complejidad**: 2
 - **Prioridad**: required
@@ -159,63 +163,72 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 ## COMPONENTE 3: VALIDACION
 
-### TASK-013: Implementar `Validator` - Estructura base
+### ✅ TASK-013: Implementar `Validator` - Estructura base
+- **Estado**: COMPLETADO
 - **Descripcion**: Implementar clase base de validador
 - **Criterios de Aceptacion**:
-  - [ ] Clase abstracta `Validator` con metodo `validate(Application, Catalog): List<ValidationError>`
-  - [ ] Estructura para multiples estrategias de validacion
+  - [x] Clase abstracta `Validator` con metodo `validate(Application, Catalog): List<ValidationError>`
+  - [x] Estructura para multiples estrategias de validacion
 - **Dependencias**: TASK-004, TASK-001, TASK-005
 - **Complejidad**: 2
 - **Prioridad**: required
 
-### TASK-014: Implementar `AttributeValidator`
+### ✅ TASK-014: Implementar `AttributeValidator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Validar que todos los atributos requeridos esten presentes
 - **Criterios de Aceptacion**:
-  - [ ] Clase `AttributeValidator` que extiende `Validator`
-  - [ ] Validar presencia de atributos con AttributeRequirement.REQUIRED
-  - [ ] Usar Attribute.isSatisfiedBy(value) para la comparacion
-  - [ ] Generar `ValidationError` para cada atributo requerido faltante
+  - [x] Clase `AttributeValidator` que extiende `Validator`
+  - [x] Validar presencia de atributos con AttributeRequirement.REQUIRED (via ValidationSchema)
+  - [x] Usar Attribute.isSatisfiedBy(value) para la comparacion (delegado a ValidationSchema.findMissingRequiredAttributes)
+  - [x] Generar `ValidationError` para cada atributo requerido faltante (MISSING_REQUIRED_ATTRIBUTE) y WARNING PRODUCT_LINE_NOT_FOUND cuando el producto no existe en el catalogo
+  - [x] Verificado contra archivo real: 0 errores en Application "Keep on Green" valida; WARNING confirmado con producto inexistente
 - **Dependencias**: TASK-013, TASK-012
 - **Complejidad**: 3
 - **Prioridad**: required
 
-### TASK-015: Implementar `RangeValidator`
+### ✅ TASK-015: Implementar `RangeValidator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Validar valores numericos dentro de rangos permitidos
 - **Criterios de Aceptacion**:
-  - [ ] Clase `RangeValidator` que extiende `Validator`
-  - [ ] Validar rangos para valores numericos cuando aplique
-  - [ ] Generar errores descriptivos
+  - [x] Clase `RangeValidator` que extiende `Validator`
+  - [x] Validar rangos para valores numericos cuando aplique (utilidad generica configurable por constructor: attributeName, min, max; valores no numericos o ausentes no generan error)
+  - [x] Generar errores descriptivos (VALUE_OUT_OF_RANGE)
+  - [x] Verificado end-to-end sobre atributo real "EngineCylinder" con rango deliberadamente excluyente
 - **Dependencias**: TASK-013, TASK-012
 - **Complejidad**: 2
 - **Prioridad**: optional
 
-### TASK-016: Implementar `EnumValidator`
+### ✅ TASK-016: Implementar `EnumValidator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Validar que valores pertenezcan a lista permitida
 - **Criterios de Aceptacion**:
-  - [ ] Clase `EnumValidator` que extiende `Validator`
-  - [ ] Validar contra lista de valores permitidos
-  - [ ] Soporte case-insensitive (configurable)
+  - [x] Clase `EnumValidator` que extiende `Validator`
+  - [x] Validar contra lista de valores permitidos (utilidad generica configurable por constructor: attributeName, allowedValues)
+  - [x] Soporte case-insensitive (configurable)
 - **Dependencias**: TASK-013, TASK-012
 - **Complejidad**: 2
 - **Prioridad**: optional
 
-### TASK-017: Implementar `CompositeValidator`
+### ✅ TASK-017: Implementar `CompositeValidator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Ejecutar multiples validadores en cadena
 - **Criterios de Aceptacion**:
-  - [ ] Clase `CompositeValidator` que extiende `Validator`
-  - [ ] Agregar multiples validadores
-  - [ ] Ejecutar todos y recopilar errores
-  - [ ] Parar en primer error critico (configurable)
+  - [x] Clase `CompositeValidator` que extiende `Validator`
+  - [x] Agregar multiples validadores (addValidator)
+  - [x] Ejecutar todos y recopilar errores
+  - [x] Parar en primer error critico (configurable via setStopOnFirstCriticalError)
+  - [x] Verificado con AttributeValidator + RangeValidator combinados, y con stopOnFirstCriticalError=true confirmando que el segundo validador no se ejecuta tras un ERROR
 - **Dependencias**: TASK-013, TASK-014, TASK-015, TASK-016
 - **Complejidad**: 2
 - **Prioridad**: required
 
-### TASK-018: Implementar `DateFormatValidator`
+### ✅ TASK-018: Implementar `DateFormatValidator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Validar formato de fechas si aplica a algun atributo
 - **Criterios de Aceptacion**:
-  - [ ] Clase `DateFormatValidator` que extiende `Validator`
-  - [ ] Validar formato ISO 8601 (YYYY-MM-DD)
-  - [ ] Soporte para multiples formatos (configurable)
+  - [x] Clase `DateFormatValidator` que extiende `Validator`
+  - [x] Validar formato ISO 8601 (YYYY-MM-DD) por defecto
+  - [x] Soporte para multiples formatos (configurable, utilidad generica por constructor)
 - **Dependencias**: TASK-013, TASK-012
 - **Complejidad**: 2
 - **Prioridad**: optional
@@ -628,4 +641,4 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 ---
 
 **Version**: 1.0
-**Estado**: En Progreso (10/54 tareas completadas)
+**Estado**: En Progreso (18/54 tareas completadas)
