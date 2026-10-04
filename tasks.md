@@ -237,36 +237,42 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 ## COMPONENTE 4: COMPARACION
 
-### TASK-019: Implementar `Comparator`
+### ✅ TASK-019: Implementar `Comparator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Comparar datos de aplicacion contra catalogo maestro
 - **Criterios de Aceptacion**:
-  - [ ] Clase `Comparator` con metodo `compare(Application, Catalog): ComparisonResult`
-  - [ ] Buscar ProductLine via Catalog.findProductByName(application.getProductName())
-  - [ ] Ejecutar validadores apropiados
-  - [ ] Calcular estadisticas de compliance
-  - [ ] Capturar informacion de auditoria
+  - [x] Clase `Comparator` con metodo `compare(Application, Catalog): ComparisonResult`
+  - [x] Buscar ProductLine via Catalog.findProductByName(application.getProductName())
+  - [x] Ejecutar validadores apropiados
+  - [x] Calcular estadisticas de compliance
+  - [x] Capturar informacion de auditoria
+  - [x] Metodo `compareAll(List<Application>, Catalog): List<ComparisonResult>` con indice interno de ProductLine (evita busqueda lineal repetida); verificado contra archivo real: 20 comparaciones individuales con `compare()` + lote completo de 81,886 aplicaciones con `compareAll()` en ~9.5s (74,515 con 100% compliance, 0 sin clasificar, 0 con atributos faltantes en esta corrida)
 - **Dependencias**: TASK-017, TASK-006
 - **Complejidad**: 3
 - **Prioridad**: required
 
-### TASK-020: Implementar `ComplianceCalculator`
+### ✅ TASK-020: Implementar `ComplianceCalculator`
+- **Estado**: COMPLETADO
 - **Descripcion**: Calcular porcentaje de compliance detallado
 - **Criterios de Aceptacion**:
-  - [ ] Clase `ComplianceCalculator` con metodo `calculate(ComparisonResult): ComplianceMetrics`
-  - [ ] Calcular compliance global (porcentaje valido)
-  - [ ] Calcular compliance por ProductLine
-  - [ ] Identificar atributos requeridos incumplidos
+  - [x] Clase `ComplianceCalculator` con metodo `calculate(ComparisonResult): ComplianceMetrics`
+  - [x] Calcular compliance global (porcentaje valido)
+  - [x] Calcular compliance por ProductLine
+  - [x] Identificar atributos requeridos incumplidos
+  - [x] Verificado con smoke test: `calculate()` sobre resultado individual y `calculateByProductLine()` agrupando manualmente 3 resultados de "A/C Condenser", retornando metricas agregadas correctas
 - **Dependencias**: TASK-006
 - **Complejidad**: 2
 - **Prioridad**: required
 
-### TASK-021: Implementar `ComparisonCache`
+### ✅ TASK-021: Implementar `ComparisonCache`
+- **Estado**: COMPLETADO
 - **Descripcion**: Cache para resultados de comparacion previos
 - **Criterios de Aceptacion**:
-  - [ ] Clase `ComparisonCache` con almacenamiento en memoria
-  - [ ] Metodo para guardar resultado con clave (aplicacion + catalogo + timestamp)
-  - [ ] Metodo para recuperar resultado
-  - [ ] Limite de tamano configurable
+  - [x] Clase `ComparisonCache` con almacenamiento en memoria
+  - [x] Metodo para guardar resultado con clave (aplicacion + catalogo + timestamp)
+  - [x] Metodo para recuperar resultado
+  - [x] Limite de tamano configurable
+  - [x] Verificado con smoke test: put/get/contains sobre 3 entradas (size=3), y `evictOlderThan(Duration.ZERO)` elimino todas las entradas (size=0)
 - **Dependencias**: TASK-006
 - **Complejidad**: 2
 - **Prioridad**: optional
@@ -641,4 +647,4 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 ---
 
 **Version**: 1.0
-**Estado**: En Progreso (18/54 tareas completadas)
+**Estado**: En Progreso (21/54 tareas completadas)
