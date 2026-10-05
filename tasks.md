@@ -309,32 +309,40 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Complejidad: 4
   - Prioridad: required
 
-- [ ] 24. Implementar `ReportPrinter` (TASK-024)
+- [x] 24. Implementar `ReportPrinter` (TASK-024)
+  - Estado: COMPLETADO
   - Descripcion: Generar representacion textual de reporte para consola
   - Criterios de Aceptacion:
-    - ⬜ Clase `ReportPrinter` con metodo `print(ComparisonResult): String`
-    - ⬜ Resumen ejecutivo con compliance porcentual
-    - ⬜ Listado de errores con formateo
+    - ✅ Clase `ReportPrinter` con metodo `print(ComparisonResult): String` (cabecera, resumen ejecutivo, tabla ASCII de errores/advertencias)
+    - ✅ Resumen ejecutivo con compliance %, atributos totales/satisfechos/incumplidos, conteo de errores y advertencias
+    - ✅ Listado de errores con tabla ASCII formateada (Severidad | Atributo | Linea de Producto | Mensaje); fila "Sin problemas detectados" si no hay errores
+    - ✅ Metodo adicional printBatch(List<ComparisonResult>) para resumen de lote (apps, compliance promedio, 100% compliant, con errores)
+    - ✅ Verificado: texto generado correctamente con 1 error forzado real; printBatch OK (longitud=409)
   - Dependencias: TASK-006
   - Complejidad: 2
   - Prioridad: optional
 
-- [ ] 25. Implementar `ExcelExporter` (TASK-025)
-  - Descripcion: Exportar resultados a archivo Excel independiente
+- [x] 25. Implementar `ExcelExporter` (TASK-025)
+  - Estado: COMPLETADO
+  - Descripcion: Exportar resultados a archivo Excel independiente por aplicacion
   - Criterios de Aceptacion:
-    - ⬜ Clase `ExcelExporter` con metodo `export(Application, ComparisonResult, File): void`
-    - ⬜ Incluir metadata (fecha, version catalogo, compliance)
-    - ⬜ Manejo de sobrescritura de archivo
+    - ✅ Clase `ExcelExporter` con metodo `export(Application, ComparisonResult, File): void` throws IOException
+    - ✅ Incluir metadata: aplicacion, vehiculo (Make/Model/Year), catalogo, fecha de exportacion, compliance %
+    - ✅ Manejo de sobrescritura: el archivo se crea o sobrescribe (comportamiento documentado en JavaDoc)
+    - ✅ Formato visual fastexcel: titulo NAVY_BLUE, etiquetas de metadata en negrita GRAY2, tabla de problemas con encabezados GRAY3, filas ERROR en DARK_RED
+    - ✅ Verificado: archivo exportado 4465 bytes, lectura confirmada con fastexcel-reader
   - Dependencias: TASK-006
   - Complejidad: 3
   - Prioridad: optional
 
-- [ ] 26. Implementar `ReportFilter` (TASK-026)
-  - Descripcion: Filtrar resultados de comparacion segun criterios
+- [x] 26. Implementar `ReportFilter` (TASK-026)
+  - Estado: COMPLETADO
+  - Descripcion: Filtrar resultados de comparacion segun criterios, devolviendo nueva instancia
   - Criterios de Aceptacion:
-    - ⬜ Clase `ReportFilter` con metodos para filtrar por: severity, productLine, attributeName
-    - ⬜ Metodo para aplicar multiples filtros
-    - ⬜ Retornar nueva instancia de `ComparisonResult` filtrada
+    - ✅ Clase `ReportFilter` con metodos filterBySeverity, filterByProductLine, filterByAttributeName (todos retornan nueva instancia de ComparisonResult, no modifican el original)
+    - ✅ Metodo applyFilters(ComparisonResult, List<Predicate<ValidationError>>) para filtros combinados (AND logico)
+    - ✅ Contadores de atributos (total/valido/invalido) recalculados en cada instancia filtrada segun errores MISSING_REQUIRED_ATTRIBUTE resultantes
+    - ✅ Verificado: filterBySeverity(ERROR)=1, filterByProductLine=1, filterByAttributeName=1, applyFilters(AND)=1, filterBySeverity(INFO)=0
   - Dependencias: TASK-006
   - Complejidad: 2
   - Prioridad: optional
@@ -812,4 +820,4 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 
 **Version**: 1.0
-**Estado**: En Progreso (22/54 tareas completadas - 41%)
+**Estado**: En Progreso (26/54 tareas completadas - 48%)
