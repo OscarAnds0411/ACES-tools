@@ -351,25 +351,33 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 ### Componente 6: INTERFAZ GRAFICA (GUI)
 
-- [ ] 27. Implementar `MainWindow` - Marco principal (TASK-027)
+- [x] 27. Implementar `MainWindow` - Marco principal (TASK-027)
+  - Estado: COMPLETADO
   - Descripcion: Ventana principal de la aplicacion
   - Criterios de Aceptacion:
-    - ⬜ JFrame con layout principal
-    - ⬜ Botones: Cargar Catalogo, Cargar ACES, Ejecutar Auditoria, Salir
-    - ⬜ Panel de estado con informacion de estado
-    - ⬜ Tamano inicial 1024x768, resizable
+    - ✅ setUndecorated(true) + barra de titulo propia (arrastrable, boton cierre con hover RED)
+    - ✅ Botones toolbar: Cargar catalogo (SCI_BLUE), Cargar ACES (SCI_BLUE), Ejecutar auditoria (FLUSH_ORANGE, disabled hasta que ambos archivos esten cargados), Salir
+    - ✅ Panel de estado en la parte inferior con setStatus(String) y setStatus(String, Color)
+    - ✅ Tamano inicial proporcional a la pantalla (84% x 88% del area disponible), minimo px(780)xpx(520), resizable
+    - ✅ CardLayout central para intercambiar paneles (registerPanel/showCard)
+    - ✅ Factor de escala DPI (S = getScaleX()) aplicado a px() y font() para HiDPI
+    - ✅ Gestion de estado: setLoadedCatalog/setLoadedApplications con checkCanRun()
+    - ✅ Paleta completa aplicada: MINE_SHAFT, FLUSH_ORANGE, SCI_BLUE, SILVER, RED, CHELSEA_GEM, MALIBU
   - Dependencias: Ninguna
   - Complejidad: 2
   - Prioridad: required
 
-- [ ] 28. Implementar `CatalogLoadPanel` (TASK-028)
+- [x] 28. Implementar `CatalogLoadPanel` (TASK-028)
+  - Estado: COMPLETADO
   - Descripcion: Panel para cargar catalogo
   - Criterios de Aceptacion:
-    - ⬜ Boton "Browse" para seleccionar archivo Excel
-    - ⬜ Campo de texto mostrando ruta del archivo
-    - ⬜ Boton "Load" para cargar catalogo
-    - ⬜ Mostrar informacion del catalogo cargado (cantidad de productos)
-    - ⬜ Manejo de errores con dialogos
+    - ✅ Boton "Examinar..." (outline SCI_BLUE) que abre JFileChooser con filtro .xlsx; recuerda el ultimo directorio
+    - ✅ Campo de texto readonly mostrando ruta del archivo seleccionado
+    - ✅ Boton "Cargar catalogo" (solido FLUSH_ORANGE) deshabilitado hasta seleccionar archivo; carga en SwingWorker (no bloquea EDT)
+    - ✅ Card de resultados (SCI_BLUE accent) con: contador de lineas de producto y atributos por linea (formateado con separador de miles), boton "Continuar: Cargar ACES"
+    - ✅ Manejo de errores con JOptionPane y actualizacion del status bar en rojo (C_ERROR)
+    - ✅ Misma paleta y estilo de card (borde acento izquierdo) que el resto de la app
+    - ✅ Auto-registra en MainWindow y conecta el boton del toolbar
   - Dependencias: TASK-027
   - Complejidad: 2
   - Prioridad: required
@@ -820,4 +828,4 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 
 **Version**: 1.0
-**Estado**: En Progreso (26/54 tareas completadas - 48%)
+**Estado**: En Progreso (28/54 tareas completadas - 52%)
