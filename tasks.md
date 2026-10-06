@@ -382,61 +382,79 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Complejidad: 2
   - Prioridad: required
 
-- [ ] 29. Implementar `ApplicationLoadPanel` (TASK-029)
+- [x] 29. Implementar `ApplicationLoadPanel` (TASK-029)
+  - Estado: COMPLETADO
   - Descripcion: Panel para cargar archivo ACES a validar
   - Criterios de Aceptacion:
-    - ⬜ Boton "Browse" para seleccionar archivo Excel
-    - ⬜ Campo de texto mostrando ruta del archivo
-    - ⬜ Boton "Load" para cargar aplicaciones
-    - ⬜ Mostrar informacion de aplicaciones cargadas (cantidad)
-    - ⬜ Manejo de errores con dialogos
+    - ✅ Boton "Examinar..." (outline SCI_BLUE) con JFileChooser filtro .xlsx
+    - ✅ Campo readonly mostrando ruta del archivo seleccionado (BoxLayout misma altura que boton)
+    - ✅ Selector de hoja dinamico (JComboBox) que aparece tras seleccionar archivo; auto-selecciona "Applications"; usa ExcelApplicationParser.readSheetNames() en SwingWorker
+    - ✅ Boton "Cargar ACES" (180x36px, SCI_BLUE) habilitado solo cuando hay hoja seleccionada; carga en SwingWorker
+    - ✅ Mostrar cantidad de aplicaciones cargadas + hoja en card de resultado con boton "Ejecutar auditoria" directo
+    - ✅ Manejo de errores con JOptionPane; almacena aplicaciones en MainWindow.setLoadedApplications() + archivo en setLoadedAcesFile()
   - Dependencias: TASK-027
   - Complejidad: 2
   - Prioridad: required
 
-- [ ] 30. Implementar `ValidationPanel` (TASK-030)
+- [x] 30. Implementar `ValidationPanel` (TASK-030)
+  - Estado: COMPLETADO
   - Descripcion: Panel para ejecutar validacion y mostrar resultados
   - Criterios de Aceptacion:
-    - ⬜ Boton "Validate" para iniciar validacion
-    - ⬜ Tabla con resultados (Aplicacion, Producto, Atributo, Estado)
-    - ⬜ Resumen de compliance (porcentaje)
-    - ⬜ Boton para exportar reporte
+    - ✅ Disparado por boton "Ejecutar auditoria" del toolbar; valida en SwingWorker con Comparator.compareAll()
+    - ✅ Tabla JTable con columnas: Aplicacion | Linea de Producto | Atributo Faltante | Estado; limitada a 10,000 filas; columna Estado coloreada (rojo=Faltante, gris=Sin clasificar)
+    - ✅ Barra de metricas: Total | 100% compliant | Con errores | Sin clasificar | Compliance prom. en cajas visuales con colores de paleta
+    - ✅ Boton "Exportar reporte" (FLUSH_ORANGE) con JFileChooser que llama ExcelReportGenerator.generateAndWriteBatch() en SwingWorker; nombre sugerido automatico basado en archivo ACES
+    - ✅ Boton "Nueva auditoria" (outline SCI_BLUE) vuelve a CARD_WELCOME
+    - ✅ 3 estados visuales: IDLE (mensaje bienvenida), RUNNING (barra progreso indeterminada), RESULTS (metricas + tabla + botones)
   - Dependencias: TASK-028, TASK-029
   - Complejidad: 3
   - Prioridad: required
 
-- [ ] 31. Implementar `StatisticsPanel` (TASK-031)
-  - Descripcion: Panel mostrando estadisticas de validacion
+- [x] 31. Implementar `StatisticsPanel` (TASK-031)
+  - Estado: COMPLETADO
+  - Descripcion: Panel mostrando estadisticas de validacion por linea de producto
   - Criterios de Aceptacion:
-    - ⬜ Tabla con estadisticas detalladas
-    - ⬜ Actualizar automaticamente tras validacion
+    - ✅ Tabla con columnas: Linea de Producto | Aplicaciones | Req. Totales | Req. Satisfechos | Compliance % (solo lineas con errores, ordenadas por compliance ascendente)
+    - ✅ Actualiza automaticamente via ComponentAdapter.componentShown() que lee MainWindow.getLastComparisonResults()
+    - ✅ Colorea columna Compliance % segun valor (rojo <50%, naranja <100%, azul 100%)
+    - ✅ Boton "Volver a Resultados"; accesible desde boton "Estadisticas" en ValidationPanel y toolbar
   - Dependencias: TASK-030
   - Complejidad: 3
   - Prioridad: optional
 
-- [ ] 32. Implementar dialogos de Archivo (TASK-032)
-  - Descripcion: Dialogos de seleccion de archivos
+- [x] 32. Implementar dialogos de Archivo (TASK-032)
+  - Estado: COMPLETADO
+  - Descripcion: Clase utilitaria FileDialogHelper centraliza los JFileChooser de la aplicacion
   - Criterios de Aceptacion:
-    - ⬜ JFileChooser con filtro .xlsx
-    - ⬜ Recordar ultimo directorio usado
+    - ✅ JFileChooser con filtro .xlsx en chooseExcelOpen() y chooseExcelSave()
+    - ✅ Recordar ultimo directorio: campo estatico lastDir compartido entre todas las invocaciones de la app
+    - ✅ chooseExcelSave() agrega .xlsx automaticamente si falta; acepta sugerencia de nombre por defecto
+    - ✅ Usado internamente por AuditPanel y ValidationPanel (exportacion); CatalogLoadPanel y ApplicationLoadPanel migrables en refactor futuro
   - Dependencias: TASK-027
   - Complejidad: 1
   - Prioridad: required
 
-- [ ] 33. Implementar dialogos de Configuracion (TASK-033)
-  - Descripcion: Dialogos para configurar opciones de validacion
+- [x] 33. Implementar dialogos de Configuracion (TASK-033)
+  - Estado: COMPLETADO
+  - Descripcion: ConfigDialog: dialogo modal con opciones basicas de la aplicacion
   - Criterios de Aceptacion:
-    - ⬜ Dialog para opciones basicas
-    - ⬜ Guardar configuracion en archivo propiedades
+    - ✅ JDialog modal con opciones: maximo de filas en tabla (spinner 1000-50000) y directorio de exportacion por defecto
+    - ✅ Guardar en ~/.validador_aces_config.properties via java.util.Properties
+    - ✅ Metodos estaticos ConfigDialog.getMaxTableRows() y getDefaultExportDir() para leer desde cualquier componente
+    - ✅ Accesible desde boton '⚙' en la barra de titulo de MainWindow
   - Dependencias: TASK-027
   - Complejidad: 2
   - Prioridad: optional
 
-- [ ] 34. Implementar `AuditPanel` (TASK-034)
-  - Descripcion: Panel mostrando historial de auditoria
+- [x] 34. Implementar `AuditPanel` (TASK-034)
+  - Estado: COMPLETADO
+  - Descripcion: Panel con historial de auditorias realizadas en la sesion
   - Criterios de Aceptacion:
-    - ⬜ Tabla con historial: timestamp, accion, resultado
-    - ⬜ Boton para exportar historial
+    - ✅ Tabla con columnas: Fecha/Hora | Accion | Detalles | Resultado | Duracion (ms); scroll al ultimo registro al agregar
+    - ✅ Boton "Exportar historial" con JFileChooser que guarda como CSV via FileDialogHelper
+    - ✅ Boton "Limpiar historial" con confirmacion; llama window.clearAuditHistory()
+    - ✅ Se alimenta automaticamente via MainWindow.addAuditReport() que delega a AuditPanel.addReport()
+    - ✅ Accesible desde boton "Historial" en el toolbar de MainWindow
   - Dependencias: TASK-007
   - Complejidad: 2
   - Prioridad: optional
@@ -828,4 +846,4 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 
 **Version**: 1.0
-**Estado**: En Progreso (28/54 tareas completadas - 52%)
+**Estado**: En Progreso (34/54 tareas completadas - 63%)

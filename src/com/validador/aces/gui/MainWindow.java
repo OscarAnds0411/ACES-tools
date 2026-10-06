@@ -69,7 +69,9 @@ public class MainWindow extends JFrame {
     public static final String CARD_WELCOME = "WELCOME";
     public static final String CARD_CATALOG = "CATALOG";
     public static final String CARD_ACES    = "ACES";
-    public static final String CARD_RESULTS = "RESULTS";
+    public static final String CARD_RESULTS    = "RESULTS";
+    public static final String CARD_STATISTICS = "STATISTICS";
+    public static final String CARD_AUDIT      = "AUDIT_HISTORY";
 
     // ── Paleta ────────────────────────────────────────────────────────────
     public static final Color WHITE         = new Color(0xFFFFFF);
@@ -292,8 +294,25 @@ public class MainWindow extends JFrame {
         left.add(dot);
         left.add(title);
 
+        JButton config = new JButton("⚙");
+        config.setFont(font(Font.PLAIN, 13));
+        config.setForeground(new Color(0x888888));
+        config.setBackground(MINE_SHAFT);
+        config.setOpaque(true);
+        config.setBorderPainted(false);
+        config.setFocusPainted(false);
+        config.setPreferredSize(new Dimension(px(38), px(32)));
+        config.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        config.setToolTipText("Configuración");
+        config.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { config.setForeground(FLUSH_ORANGE); }
+            public void mouseExited(MouseEvent e)  { config.setForeground(new Color(0x888888)); }
+        });
+        config.addActionListener(e -> new ConfigDialog(MainWindow.this).setVisible(true));
+
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         right.setOpaque(false);
+        right.add(config);
         right.add(close);
 
         JPanel bar = new JPanel(new BorderLayout());
@@ -332,6 +351,10 @@ public class MainWindow extends JFrame {
         left.add(btnAces);
         left.add(toolbarSep());
         left.add(btnRun);
+        left.add(toolbarSep());
+        left.add(buildGhostBtn("Estadísticas", () -> showCard(CARD_STATISTICS)));
+        left.add(Box.createHorizontalStrut(px(4)));
+        left.add(buildGhostBtn("Historial",    () -> showCard(CARD_AUDIT)));
 
         // Lado derecho: salir
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
@@ -504,6 +527,25 @@ public class MainWindow extends JFrame {
         return btn;
     }
 
+    /** Botón "fantasma" para el toolbar: texto pequeño, transparente, con hover sutil. */
+    private JButton buildGhostBtn(String label, Runnable action) {
+        JButton btn = new JButton(label);
+        btn.setFont(font(Font.PLAIN, 11));
+        btn.setForeground(new Color(0xAABBCC));
+        btn.setBackground(MINE_SHAFT);
+        btn.setOpaque(true);
+        btn.setBorderPainted(false);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setBorder(BorderFactory.createEmptyBorder(px(4), px(10), px(4), px(10)));
+        btn.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { btn.setForeground(WHITE); }
+            public void mouseExited(MouseEvent e)  { btn.setForeground(new Color(0xAABBCC)); }
+        });
+        btn.addActionListener(e -> action.run());
+        return btn;
+    }
+
     /** Separador vertical del toolbar. */
     private JPanel toolbarSep() {
         JPanel sep = new JPanel();
@@ -531,6 +573,9 @@ public class MainWindow extends JFrame {
 
     private com.validador.aces.models.Catalog      loadedCatalog;
     private java.util.List<com.validador.aces.models.Application> loadedApplications;
+    private java.io.File                            loadedAcesFile;
+    private java.util.Map<String, java.util.List<com.validador.aces.models.ComparisonResult>> lastComparisonResults;
+    private final java.util.List<com.validador.aces.models.AuditReport> auditHistory = new java.util.ArrayList<>();
 
     /**
      * Registra el catálogo cargado y habilita "Ejecutar" si ambos archivos
@@ -566,6 +611,31 @@ public class MainWindow extends JFrame {
     }
 
     /** Activa "Ejecutar auditoría" solo cuando ambos archivos están disponibles. */
+    public void setLoadedAcesFile(java.io.File file) { this.loadedAcesFile = file; }
+    public java.io.File getLoadedAcesFile() { return loadedAcesFile; }
+
+    // ── Resultados de comparación (usados por StatisticsPanel) ───────────
+    public void setLastComparisonResults(
+            java.util.Map<String, java.util.List<com.validador.aces.models.ComparisonResult>> results) {
+        this.lastComparisonResults = results;
+    }
+    public java.util.Map<String, java.util.List<com.validador.aces.models.ComparisonResult>>
+            getLastComparisonResults() {
+        return lastComparisonResults;
+    }
+
+    // ── Historial de auditorías (usado por AuditPanel) ───────────────────
+    private AuditPanel auditPanel;
+    public void setAuditPanel(AuditPanel panel) { this.auditPanel = panel; }
+    public void addAuditReport(com.validador.aces.models.AuditReport report) {
+        auditHistory.add(report);
+        if (auditPanel != null) auditPanel.addReport(report);
+    }
+    public java.util.List<com.validador.aces.models.AuditReport> getAuditHistory() {
+        return java.util.Collections.unmodifiableList(auditHistory);
+    }
+    public void clearAuditHistory() { auditHistory.clear(); }
+
     private void checkCanRun() {
         boolean ready = loadedCatalog != null && loadedApplications != null;
         setRunEnabled(ready);
@@ -596,9 +666,12 @@ public class MainWindow extends JFrame {
 
         SwingUtilities.invokeLater(() -> {
             MainWindow w = new MainWindow();
-            // Registrar todos los paneles disponibles
             new CatalogLoadPanel(w);
-            // ApplicationLoadPanel se agregara en TASK-029
+            new ApplicationLoadPanel(w);
+            new ValidationPanel(w);
+            new StatisticsPanel(w);
+            AuditPanel ap = new AuditPanel(w);
+            w.setAuditPanel(ap);
             w.setVisible(true);
         });
     }
