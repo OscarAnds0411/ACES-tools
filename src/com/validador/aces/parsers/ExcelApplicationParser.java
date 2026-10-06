@@ -67,23 +67,34 @@ public class ExcelApplicationParser extends ApplicationParser {
 
     /**
      * Parsea las aplicaciones de la hoja indicada por el usuario.
-     * Si {@code sheetName} es null o vacío usa {@link #DEFAULT_SHEET_NAME}.
+     * Si {@code sheetName} es null o vacío, intenta detectar automáticamente
+     * la hoja que contiene aplicaciones (con datos en las 7 primeras columnas).
      *
      * @param file      archivo .xlsx del ACES
-     * @param sheetName nombre exacto de la hoja a procesar
+     * @param sheetName nombre exacto de la hoja a procesar, o null para auto-detectar
      * @return lista de aplicaciones construidas
      * @throws ParseException si el archivo, la hoja o el formato son inválidos
      */
     public List<Application> parse(File file, String sheetName) throws ParseException {
         validateFileExists(file);
-        String target = (sheetName != null && !sheetName.trim().isEmpty())
-                ? sheetName : DEFAULT_SHEET_NAME;
 
         try (ReadableWorkbook workbook = new ReadableWorkbook(file)) {
-            Optional<Sheet> sheetOpt = workbook.findSheet(target);
+            // Determinar qué hoja procesar
+            String targetSheet = sheetName;
+            if (targetSheet == null || targetSheet.trim().isEmpty()) {
+                // Auto-detectar: buscar primera hoja que tenga datos válidos de aplicaciones
+                targetSheet = autoDetectApplicationSheet(workbook);
+                if (targetSheet == null) {
+                    throw new ParseException(
+                        "No se pudo detectar automáticamente una hoja válida con aplicaciones: "
+                        + file.getPath());
+                }
+            }
+
+            Optional<Sheet> sheetOpt = workbook.findSheet(targetSheet);
             if (!sheetOpt.isPresent()) {
                 throw new ParseException(
-                    "El archivo no contiene la hoja \"" + target + "\": " + file.getPath());
+                    "El archivo no contiene la hoja \"" + targetSheet + "\": " + file.getPath());
             }
             List<Application> applications = new ArrayList<>();
             try (Stream<Row> rows = sheetOpt.get().openStream()) {
@@ -99,6 +110,65 @@ public class ExcelApplicationParser extends ApplicationParser {
             throw new ParseException(
                 "Error inesperado al procesar el archivo de aplicaciones: " + file.getPath(), e);
         }
+    }
+
+    /**
+     * Intenta detectar automáticamente cuál es la hoja que contiene aplicaciones.
+     * Busca la primera hoja que tenga datos con estructura válida (Make, Model, Year, Product).
+     *
+     * @param workbook libro Excel abierto
+     * @return nombre de la hoja detectada, o null si ninguna es válida
+     */
+    private String autoDetectApplicationSheet(ReadableWorkbook workbook) {
+        try {
+            for (Sheet sheet : (Iterable<Sheet>) () -> workbook.getSheets().iterator()) {
+                try (Stream<Row> rows = sheet.openStream()) {
+                    if (isValidApplicationSheet(rows.iterator())) {
+                        return sheet.getName();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Si hay error durante la detección, retornar null y dejar que falle en parse()
+        }
+        return null;
+    }
+
+    /**
+     * Verifica si una hoja tiene estructura válida de aplicaciones.
+     * Válida si: tiene encabezados y al menos una fila con Make, Model, Year, Product no vacíos.
+     *
+     * @param rows iterador de filas de la hoja
+     * @return true si la hoja parece tener datos de aplicaciones válidos
+     */
+    private boolean isValidApplicationSheet(java.util.Iterator<Row> rows) {
+        if (!rows.hasNext()) return false;
+
+        // Saltar encabezados
+        rows.next();
+
+        // Buscar al menos una fila válida con Make, Model, Year, Product
+        int checked = 0;
+        int maxToCheck = 100; // revisar hasta 100 filas para no tardar mucho
+        while (rows.hasNext() && checked < maxToCheck) {
+            Row row = rows.next();
+            checked++;
+
+            String make = row.getCellText(0);
+            String model = row.getCellText(1);
+            String year = row.getCellText(2);
+            String product = row.getCellText(3);
+
+            // Si encuentro una fila con estos 4 campos no vacíos, asumimos que es una hoja válida
+            if (make != null && !make.trim().isEmpty() &&
+                model != null && !model.trim().isEmpty() &&
+                year != null && !year.trim().isEmpty() &&
+                product != null && !product.trim().isEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // ── Procesado de filas ─────────────────────────────────────────────────
@@ -137,16 +207,16 @@ public class ExcelApplicationParser extends ApplicationParser {
         }
         Application app = new Application(
             make,
-            row.getCellAsString(1).orElse(null),
-            row.getCellAsString(2).orElse(null),
-            row.getCellAsString(3).orElse(null)
+            row.getCellText(1),    // usar getCellText en lugar de getCellAsString
+            row.getCellText(2),    // funciona tanto para STRING como para NUMBER
+            row.getCellText(3)
         );
-        app.setPartNumber(row.getCellAsString(4).orElse(null));
-        app.setMfrLabel(row.getCellAsString(5).orElse(null));
-        app.setPosition(row.getCellAsString(6).orElse(null));
+        app.setPartNumber(row.getCellText(4));
+        app.setMfrLabel(row.getCellText(5));
+        app.setPosition(row.getCellText(6));
         for (int i = 0; i < attributeHeaders.size(); i++) {
             app.setAttributeValue(attributeHeaders.get(i),
-                row.getCellAsString(FIRST_ATTRIBUTE_COLUMN + i).orElse(null));
+                row.getCellText(FIRST_ATTRIBUTE_COLUMN + i));
         }
         return app;
     }

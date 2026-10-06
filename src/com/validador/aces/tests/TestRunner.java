@@ -51,6 +51,21 @@ public class TestRunner {
         // TASK-042
         runSuite("[TASK-042] CompositeValidatorTest", CompositeValidatorTest.class);
 
+        // TASK-043
+        runSuite("[TASK-043] ComparatorTest", ComparatorTest.class);
+
+        // TASK-044
+        runSuite("[TASK-044] EndToEndTest", EndToEndTest.class);
+
+        // TASK-045
+        runSuite("[TASK-045] ValidationIdempotenceTest", ValidationIdempotenceTest.class);
+
+        // TASK-046
+        runSuite("[TASK-046] ExcelReportGeneratorTest", ExcelReportGeneratorTest.class);
+
+        // TASK-047
+        runSuite("[TASK-047] ReportCompletenessTest", ReportCompletenessTest.class);
+
         // Resumen final
         System.out.println();
         System.out.println(sep);

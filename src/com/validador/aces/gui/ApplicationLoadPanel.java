@@ -407,17 +407,32 @@ public class ApplicationLoadPanel extends JPanel {
             @Override protected void done() {
                 try {
                     List<String> sheets = get();
-                    DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
-                    for (String s : sheets) model.addElement(s);
-                    sheetCombo.setModel(model);
+                    
+                    // Si solo hay una hoja, cargar directamente sin mostrar el combo
+                    if (sheets.size() == 1) {
+                        selectedSheet = sheets.get(0);
+                        sheetSection.setVisible(false);
+                        sheetStatus.setVisible(false);
+                        btnLoad.setEnabled(true);
+                    } else {
+                        // Múltiples hojas: mostrar combo para que el usuario elija
+                        DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
+                        for (String s : sheets) model.addElement(s);
+                        sheetCombo.setModel(model);
 
-                    String def = ExcelApplicationParser.DEFAULT_SHEET_NAME;
-                    for (int i = 0; i < model.getSize(); i++) {
-                        if (def.equals(model.getElementAt(i))) { sheetCombo.setSelectedIndex(i); break; }
+                        String def = ExcelApplicationParser.DEFAULT_SHEET_NAME;
+                        int selectedIndex = 0;
+                        for (int i = 0; i < model.getSize(); i++) {
+                            if (def.equals(model.getElementAt(i))) {
+                                selectedIndex = i;
+                                break;
+                            }
+                        }
+                        sheetCombo.setSelectedIndex(selectedIndex);
+                        sheetStatus.setVisible(false);
+                        selectedSheet = (String) sheetCombo.getSelectedItem();
+                        btnLoad.setEnabled(selectedSheet != null);
                     }
-                    sheetStatus.setVisible(false);
-                    selectedSheet = (String) sheetCombo.getSelectedItem();
-                    btnLoad.setEnabled(selectedSheet != null);
                 } catch (Exception ex) {
                     sheetStatus.setText("No se pudieron leer las hojas del archivo.");
                     sheetStatus.setForeground(MainWindow.C_ERROR);
@@ -432,7 +447,7 @@ public class ApplicationLoadPanel extends JPanel {
         btnLoad.setEnabled(false);
         btnBrowse.setEnabled(false);
         window.setButtonsEnabled(false);
-        window.setStatus("Cargando ACES…  Por favor espere.");
+        window.setStatus("Cargando ACES…  Detectando hoja de aplicaciones.");
 
         final File   file  = selectedFile;
         final String sheet = selectedSheet;

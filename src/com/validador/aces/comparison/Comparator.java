@@ -157,12 +157,16 @@ public class Comparator {
 
         long start = System.currentTimeMillis();
 
-        Map<String, ProductLine> index = buildProductLineIndex(catalog);
+        // Construir índices: productLine y ValidationSchema
+        Map<String, ProductLine> productIndex = buildProductLineIndex(catalog);
+        Map<String, ValidationSchema> schemaCache = buildValidationSchemaCache(productIndex);
+
         List<ComparisonResult> results = new ArrayList<>();
         for (Application application : applications) {
             String key = normalizeKey(application.getProductName());
-            ProductLine line = key == null ? null : index.get(key);
-            results.add(compareInternal(application, catalog, line));
+            ProductLine line = key == null ? null : productIndex.get(key);
+            ValidationSchema schema = key == null ? null : schemaCache.get(key);
+            results.add(compareInternalOptimized(application, catalog, line, schema));
         }
 
         long duration = System.currentTimeMillis() - start;
@@ -187,6 +191,58 @@ public class Comparator {
             }
         }
         return index;
+    }
+
+    /**
+     * Construye el índice de esquemas de validación precalculados, uno por cada
+     * línea de producto encontrada. Esto evita recalcular el esquema para cada
+     * aplicación en compareAll(), lo que es crucial para lotes grandes.
+     *
+     * @param productIndex índice de líneas de producto por nombre normalizado
+     * @return mapa de nombre normalizado a {@link ValidationSchema}
+     */
+    private Map<String, ValidationSchema> buildValidationSchemaCache(Map<String, ProductLine> productIndex) {
+        Map<String, ValidationSchema> cache = new HashMap<>();
+        for (Map.Entry<String, ProductLine> entry : productIndex.entrySet()) {
+            cache.put(entry.getKey(), new ValidationSchema(entry.getValue()));
+        }
+        return cache;
+    }
+
+    /**
+     * Versión optimizada de compareInternal que usa un esquema precalculado,
+     * evitando la creación repetida de ValidationSchema para cada aplicación.
+     *
+     * @param application aplicación a comparar
+     * @param catalog     catálogo maestro
+     * @param line        línea de producto ya resuelta, o null
+     * @param schema      esquema de validación precalculado, o null
+     * @return resultado de la comparación
+     */
+    private ComparisonResult compareInternalOptimized(Application application, Catalog catalog, 
+                                                      ProductLine line, ValidationSchema schema) {
+        CompositeValidator compositeValidator = new CompositeValidator();
+        compositeValidator.addValidator(new AttributeValidator());
+        compositeValidator.setStopOnFirstCriticalError(stopOnFirstCriticalError);
+
+        List<ValidationError> allErrors = compositeValidator.validate(application, catalog);
+
+        ComparisonResult result = new ComparisonResult(application.getName(), catalog.getName());
+        result.addErrors(allErrors);
+
+        if (line != null && schema != null) {
+            int total = schema.getRequiredAttributes().size();
+            int missingCount = countErrorsByCode(allErrors, AttributeValidator.MISSING_REQUIRED_ATTRIBUTE);
+            result.setTotalAttributes(total);
+            result.setInvalidAttributes(missingCount);
+            result.setValidAttributes(total - missingCount);
+        } else {
+            result.setTotalAttributes(0);
+            result.setValidAttributes(0);
+            result.setInvalidAttributes(0);
+        }
+
+        return result;
     }
 
     private String normalizeKey(String value) {
