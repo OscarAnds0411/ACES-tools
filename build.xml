@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project name="validador-aces" default="compile" basedir=".">
     
     <!-- Properties -->
@@ -112,9 +112,17 @@
     </target>
     
     <!-- Target: Test (opcional) -->
-    <target name="test" depends="compile" description="Ejecutar tests unitarios">
-        <echo message="Ejecutando tests..."/>
-        <echo message="Nota: Implementar después de escribir tests"/>
+    <target name="test" depends="compile" description="Ejecutar suite de tests unitarios y de round-trip">
+        <echo message="Ejecutando suite de tests..."/>
+        <java classname="com.validador.aces.tests.TestRunner"
+              fork="true"
+              dir="${basedir}"
+              failonerror="false">
+            <classpath>
+                <fileset dir="${lib.dir}" includes="*.jar"/>
+                <pathelement location="${bin.dir}"/>
+            </classpath>
+        </java>
     </target>
     
     <!-- Target: All -->
@@ -150,3 +158,4 @@
     </target>
 
 </project>
+
