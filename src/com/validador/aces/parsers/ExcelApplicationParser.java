@@ -3,8 +3,12 @@ package com.validador.aces.parsers;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -17,12 +21,16 @@ import com.validador.aces.models.Application;
 /**
  * Parser concreto para el archivo ACES de aplicaciones (.xlsx).
  *
- * <p>Mapeo de columnas de la hoja (0-indexed):</p>
+ * <p>Las columnas se localizan por el nombre de su encabezado (sin distinguir
+ * mayúsculas), no por posición:</p>
  * <ul>
- *   <li>Col 0: Make, Col 1: Model, Col 2: Year, Col 3: Product</li>
- *   <li>Col 4: PartNumber, Col 5: MfrLabel, Col 6: Position</li>
- *   <li>Col 7+: atributos técnicos con valores reales (null si vacío)</li>
+ *   <li>Obligatorias: Make, Model, Year, Product</li>
+ *   <li>Opcionales: PartNumber, MfrLabel, Position</li>
+ *   <li>Cualquier otra columna es un atributo técnico (null si la celda está vacía).
+ *       Si se indican "encabezados de interés" (los atributos del catálogo), solo se
+ *       leen esas columnas y el resto se ignora.</li>
  * </ul>
+ * <p>Solo se procesa la hoja indicada; las demás hojas del libro se ignoran.</p>
  */
 public class ExcelApplicationParser extends ApplicationParser {
 
@@ -32,7 +40,8 @@ public class ExcelApplicationParser extends ApplicationParser {
      */
     public static final String DEFAULT_SHEET_NAME = "Applications";
 
-    private static final int FIRST_ATTRIBUTE_COLUMN = 7;
+    private static final String[] REQUIRED_HEADERS = {"Make", "Model", "Year", "Product"};
+    private static final String[] OPTIONAL_CORE_HEADERS = {"PartNumber", "MfrLabel", "Position"};
 
     // ── Utilidad estática ─────────────────────────────────────────────────
 
@@ -59,30 +68,34 @@ public class ExcelApplicationParser extends ApplicationParser {
 
     // ── Implementación de ApplicationParser ───────────────────────────────
 
-    /** Parsea usando la hoja {@link #DEFAULT_SHEET_NAME}. */
+    /** Parsea usando la hoja {@link #DEFAULT_SHEET_NAME} y todas las columnas de atributos. */
     @Override
     public List<Application> parse(File file) throws ParseException {
-        return parse(file, DEFAULT_SHEET_NAME);
+        return parse(file, DEFAULT_SHEET_NAME, null);
+    }
+
+    /** Parsea la hoja indicada leyendo todas las columnas de atributos. */
+    public List<Application> parse(File file, String sheetName) throws ParseException {
+        return parse(file, sheetName, null);
     }
 
     /**
-     * Parsea las aplicaciones de la hoja indicada por el usuario.
-     * Si {@code sheetName} es null o vacío, intenta detectar automáticamente
-     * la hoja que contiene aplicaciones (con datos en las 7 primeras columnas).
+     * Parsea únicamente la hoja indicada y solo los encabezados de interés.
      *
-     * @param file      archivo .xlsx del ACES
-     * @param sheetName nombre exacto de la hoja a procesar, o null para auto-detectar
-     * @return lista de aplicaciones construidas
-     * @throws ParseException si el archivo, la hoja o el formato son inválidos
+     * @param file              archivo .xlsx del ACES
+     * @param sheetName         hoja a procesar, o null/vacío para auto-detectar
+     * @param headersOfInterest nombres de atributos a leer (normalmente los del catálogo);
+     *                          las columnas que no estén aquí se ignoran. Si es null se
+     *                          leen todas las columnas de atributos.
+     * @throws ParseException si el archivo, la hoja o el encabezado son inválidos
      */
-    public List<Application> parse(File file, String sheetName) throws ParseException {
+    public List<Application> parse(File file, String sheetName, Set<String> headersOfInterest)
+            throws ParseException {
         validateFileExists(file);
 
         try (ReadableWorkbook workbook = new ReadableWorkbook(file)) {
-            // Determinar qué hoja procesar
             String targetSheet = sheetName;
             if (targetSheet == null || targetSheet.trim().isEmpty()) {
-                // Auto-detectar: buscar primera hoja que tenga datos válidos de aplicaciones
                 targetSheet = autoDetectApplicationSheet(workbook);
                 if (targetSheet == null) {
                     throw new ParseException(
@@ -98,7 +111,7 @@ public class ExcelApplicationParser extends ApplicationParser {
             }
             List<Application> applications = new ArrayList<>();
             try (Stream<Row> rows = sheetOpt.get().openStream()) {
-                processRows(rows.iterator(), applications);
+                processRows(rows.iterator(), applications, headersOfInterest);
             }
             return applications;
         } catch (IOException e) {
@@ -112,18 +125,13 @@ public class ExcelApplicationParser extends ApplicationParser {
         }
     }
 
-    /**
-     * Intenta detectar automáticamente cuál es la hoja que contiene aplicaciones.
-     * Busca la primera hoja que tenga datos con estructura válida (Make, Model, Year, Product).
-     *
-     * @param workbook libro Excel abierto
-     * @return nombre de la hoja detectada, o null si ninguna es válida
-     */
+    /** Devuelve la primera hoja cuyo encabezado contiene las columnas obligatorias, o null. */
     private String autoDetectApplicationSheet(ReadableWorkbook workbook) {
         try {
             for (Sheet sheet : (Iterable<Sheet>) () -> workbook.getSheets().iterator()) {
                 try (Stream<Row> rows = sheet.openStream()) {
-                    if (isValidApplicationSheet(rows.iterator())) {
+                    java.util.Iterator<Row> it = rows.iterator();
+                    if (it.hasNext() && missingRequired(readHeaderColumns(it.next())) == null) {
                         return sheet.getName();
                     }
                 }
@@ -134,94 +142,111 @@ public class ExcelApplicationParser extends ApplicationParser {
         return null;
     }
 
-    /**
-     * Verifica si una hoja tiene estructura válida de aplicaciones.
-     * Válida si: tiene encabezados y al menos una fila con Make, Model, Year, Product no vacíos.
-     *
-     * @param rows iterador de filas de la hoja
-     * @return true si la hoja parece tener datos de aplicaciones válidos
-     */
-    private boolean isValidApplicationSheet(java.util.Iterator<Row> rows) {
-        if (!rows.hasNext()) return false;
+    // ── Encabezados ────────────────────────────────────────────────────────
 
-        // Saltar encabezados
-        rows.next();
+    /** Columnas de una hoja resueltas por nombre de encabezado. */
+    private static final class HeaderColumns {
+        /** Nombre núcleo en minúsculas (make, model, ...) → índice de columna. */
+        final Map<String, Integer> core = new HashMap<>();
+        /** Nombre de atributo → índice de columna (en orden de aparición). */
+        final Map<String, Integer> attributes = new LinkedHashMap<>();
+    }
 
-        // Buscar al menos una fila válida con Make, Model, Year, Product
-        int checked = 0;
-        int maxToCheck = 100; // revisar hasta 100 filas para no tardar mucho
-        while (rows.hasNext() && checked < maxToCheck) {
-            Row row = rows.next();
-            checked++;
-
-            String make = row.getCellText(0);
-            String model = row.getCellText(1);
-            String year = row.getCellText(2);
-            String product = row.getCellText(3);
-
-            // Si encuentro una fila con estos 4 campos no vacíos, asumimos que es una hoja válida
-            if (make != null && !make.trim().isEmpty() &&
-                model != null && !model.trim().isEmpty() &&
-                year != null && !year.trim().isEmpty() &&
-                product != null && !product.trim().isEmpty()) {
-                return true;
+    /** Clasifica los encabezados en columnas núcleo y de atributos (la primera aparición gana). */
+    private static HeaderColumns readHeaderColumns(Row headerRow) {
+        HeaderColumns result = new HeaderColumns();
+        for (int i = 0; i < headerRow.getCellCount(); i++) {
+            String header = headerRow.getCellText(i);
+            if (header == null || header.trim().isEmpty()) continue;
+            header = header.trim();
+            String key = header.toLowerCase();
+            if (isCoreHeader(key)) {
+                result.core.putIfAbsent(key, i);
+            } else {
+                result.attributes.putIfAbsent(header, i);
             }
         }
+        return result;
+    }
 
+    private static boolean isCoreHeader(String lowerKey) {
+        for (String h : REQUIRED_HEADERS) if (h.equalsIgnoreCase(lowerKey)) return true;
+        for (String h : OPTIONAL_CORE_HEADERS) if (h.equalsIgnoreCase(lowerKey)) return true;
         return false;
+    }
+
+    /** @return nombre de la primera columna obligatoria que falta, o null si están todas */
+    private static String missingRequired(HeaderColumns columns) {
+        for (String h : REQUIRED_HEADERS) {
+            if (!columns.core.containsKey(h.toLowerCase())) return h;
+        }
+        return null;
     }
 
     // ── Procesado de filas ─────────────────────────────────────────────────
 
-    private void processRows(java.util.Iterator<Row> rows, List<Application> applications) {
+    private void processRows(java.util.Iterator<Row> rows, List<Application> applications,
+                             Set<String> headersOfInterest) throws ParseException {
         if (!rows.hasNext()) return;
-        Row headerRow = rows.next();
-        List<String> attributeHeaders = readAttributeHeaders(headerRow);
-        int rowNumber = 1;
+        HeaderColumns columns = readHeaderColumns(rows.next());
+        String missing = missingRequired(columns);
+        if (missing != null) {
+            throw new ParseException(
+                "La hoja no tiene el formato ACES esperado: falta el encabezado \"" + missing
+                + "\" (se requieren Make, Model, Year y Product).");
+        }
+
+        // Columnas de atributos a leer: nombre canónico (el del catálogo) → índice
+        Map<String, Integer> attributeColumns = selectAttributeColumns(columns, headersOfInterest);
+
+        int skipped = 0;
         while (rows.hasNext()) {
-            rowNumber++;
-            Application app = buildApplication(rows.next(), attributeHeaders, rowNumber);
-            if (app != null) applications.add(app);
+            Application app = buildApplication(rows.next(), columns, attributeColumns);
+            if (app != null) applications.add(app); else skipped++;
+        }
+        if (skipped > 0) {
+            System.err.println("ExcelApplicationParser: " + skipped + " filas omitidas (Make vacío).");
         }
     }
 
-    private List<String> readAttributeHeaders(Row headerRow) {
-        List<String> headers = new ArrayList<>();
-        int cellCount = headerRow.getCellCount();
-        for (int i = FIRST_ATTRIBUTE_COLUMN; i < cellCount; i++) {
-            String header = headerRow.getCellAsString(i).orElse(null);
-            if (header == null || header.trim().isEmpty()) {
-                System.err.println("ExcelApplicationParser: encabezado vacío en col " + i + ", se omite.");
-                continue;
-            }
-            headers.add(header);
+    private static Map<String, Integer> selectAttributeColumns(HeaderColumns columns,
+                                                               Set<String> headersOfInterest) {
+        if (headersOfInterest == null) return columns.attributes;
+        Map<String, String> canonicalByLower = new HashMap<>();
+        for (String name : headersOfInterest) {
+            if (name != null) canonicalByLower.putIfAbsent(name.trim().toLowerCase(), name);
         }
-        return headers;
+        Map<String, Integer> selected = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> e : columns.attributes.entrySet()) {
+            String canonical = canonicalByLower.get(e.getKey().toLowerCase());
+            if (canonical != null) selected.put(canonical, e.getValue());
+        }
+        return selected;
     }
 
-    private Application buildApplication(Row row, List<String> attributeHeaders, int rowNum) {
-        String make = row.getCellText(0);
-        if (make == null || make.trim().isEmpty()) {
-            System.err.println("ExcelApplicationParser: fila " + rowNum + " omitida (Make vacío).");
-            return null;
-        }
+    private Application buildApplication(Row row, HeaderColumns columns,
+                                         Map<String, Integer> attributeColumns) {
+        String make = cell(row, columns.core.get("make"));
+        if (make == null) return null;
         Application app = new Application(
             make,
-            row.getCellText(1),    // usar getCellText en lugar de getCellAsString
-            row.getCellText(2),    // funciona tanto para STRING como para NUMBER
-            row.getCellText(3)
+            cell(row, columns.core.get("model")),
+            cell(row, columns.core.get("year")),
+            cell(row, columns.core.get("product"))
         );
-        app.setPartNumber(blankToNull(row.getCellText(4)));
-        app.setMfrLabel(blankToNull(row.getCellText(5)));
-        app.setPosition(blankToNull(row.getCellText(6)));
-        for (int i = 0; i < attributeHeaders.size(); i++) {
-            app.setAttributeValue(attributeHeaders.get(i),
-                blankToNull(row.getCellText(FIRST_ATTRIBUTE_COLUMN + i)));
+        app.setPartNumber(cell(row, columns.core.get("partnumber")));
+        app.setMfrLabel(cell(row, columns.core.get("mfrlabel")));
+        app.setPosition(cell(row, columns.core.get("position")));
+        for (Map.Entry<String, Integer> e : attributeColumns.entrySet()) {
+            app.setAttributeValue(e.getKey(), cell(row, e.getValue()));
         }
         return app;
     }
 
-    private static String blankToNull(String value) {
+    /** Texto de la celda, o null si la columna no existe o la celda está vacía. */
+    private static String cell(Row row, Integer column) {
+        if (column == null) return null;
+        String value = row.getCellText(column);
         return (value == null || value.trim().isEmpty()) ? null : value;
     }
 }

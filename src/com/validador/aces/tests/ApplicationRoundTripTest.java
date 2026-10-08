@@ -83,6 +83,78 @@ public final class ApplicationRoundTripTest {
         } finally { tmp.delete(); }
     }
 
+    // ── Test 5: columnas por nombre de encabezado, no por posición ────────
+
+    public static void testParse_columnsResolvedByHeaderName() throws Exception {
+        File tmp = writeTmpReorderedAces("byname");
+        try {
+            List<Application> apps = new ExcelApplicationParser().parse(tmp, "Applications");
+            Assert.assertEquals(1, apps.size(), "Debe parsear la única aplicación");
+            Application a = apps.get(0);
+            Assert.assertEquals("Ford", a.getMake(), "Make se resuelve por nombre aunque no esté en col 0");
+            Assert.assertEquals("F-150", a.getModel(), "Model resuelto por nombre");
+            Assert.assertEquals("5.0", a.getAttributeValue("EngineLiters"), "Atributo resuelto por nombre");
+        } finally { tmp.delete(); }
+    }
+
+    // ── Test 6: solo se leen los encabezados de interés ───────────────────
+
+    public static void testParse_headersOfInterest_ignoresOtherColumns() throws Exception {
+        File tmp = writeTmpReorderedAces("interest");
+        try {
+            java.util.Set<String> interest = new java.util.HashSet<>();
+            interest.add("enginelitERS"); // coincide sin distinguir mayúsculas
+            List<Application> apps = new ExcelApplicationParser().parse(tmp, "Applications", interest);
+            Application a = apps.get(0);
+            Assert.assertEquals("5.0", a.getAttributeValue("enginelitERS"),
+                "La columna de interés se guarda con el nombre canónico del catálogo");
+            Assert.assertTrue(!a.hasAttribute("Color"), "Columnas fuera de interés se ignoran");
+            Assert.assertEquals(1, a.getAttributeCount(), "Solo 1 atributo de interés");
+        } finally { tmp.delete(); }
+    }
+
+    // ── Test 7: solo se procesa la hoja elegida ───────────────────────────
+
+    public static void testParse_otherSheetsIgnored() throws Exception {
+        File tmp = writeTmpReorderedAces("sheets");
+        try {
+            // La hoja "Otra" tiene un formato inválido; no debe afectar si no se elige
+            List<Application> apps = new ExcelApplicationParser().parse(tmp, "Applications");
+            Assert.assertEquals(1, apps.size(), "La hoja elegida se parsea sin tocar las demás");
+        } finally { tmp.delete(); }
+    }
+
+    // ── Test 8: hoja sin encabezados obligatorios se rechaza ──────────────
+
+    public static void testParse_missingRequiredHeader_throws() throws Exception {
+        File tmp = writeTmpReorderedAces("badsheet");
+        try {
+            boolean threw = false;
+            try { new ExcelApplicationParser().parse(tmp, "Otra"); }
+            catch (com.validador.aces.parsers.ParseException e) { threw = true; }
+            Assert.assertTrue(threw, "Una hoja sin Make/Model/Year/Product debe rechazarse");
+        } finally { tmp.delete(); }
+    }
+
+    /** Excel con columnas desordenadas, columnas extra y una segunda hoja con formato inválido. */
+    static File writeTmpReorderedAces(String prefix) throws Exception {
+        File tmp = File.createTempFile(prefix + "_", ".xlsx");
+        tmp.deleteOnExit();
+        try (OutputStream os = new FileOutputStream(tmp)) {
+            Workbook wb = new Workbook(os, "test", "1.0");
+            Worksheet ws = wb.newWorksheet("Applications");
+            String[] h = {"Notas", "Color", "Year", "EngineLiters", "Make", "Product", "Model"};
+            String[] v = {"x", "Rojo", "2005", "5.0", "Ford", "Belt Drive", "F-150"};
+            for (int i = 0; i < h.length; i++) { ws.value(0, i, h[i]); ws.value(1, i, v[i]); }
+            Worksheet other = wb.newWorksheet("Otra");
+            other.value(0, 0, "Algo");
+            other.value(0, 1, "Distinto");
+            other.value(1, 0, "1");
+            wb.finish();
+        }
+        return tmp;
+    }
+
     // ── Utilidad: escribe un Excel ACES de prueba ─────────────────────────
 
     /**

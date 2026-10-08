@@ -4,7 +4,9 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Objects;
 
 /**
@@ -79,6 +81,20 @@ public class Catalog implements Serializable {
      */
     public List<ProductLine> getProductLines() {
         return Collections.unmodifiableList(productLines);
+    }
+
+    /**
+     * Nombres de todos los atributos que aparecen en alguna línea de producto.
+     * Sirve para saber qué columnas de un ACES son de interés.
+     *
+     * @return conjunto ordenado (por aparición) de nombres de atributo
+     */
+    public Set<String> getAllAttributeNames() {
+        Set<String> names = new LinkedHashSet<>();
+        for (ProductLine pl : productLines) {
+            for (Attribute a : pl.getAttributes()) names.add(a.getName());
+        }
+        return names;
     }
 
     /**

@@ -454,7 +454,10 @@ public class ApplicationLoadPanel extends JPanel {
 
         new SwingWorker<List<Application>, Void>() {
             @Override protected List<Application> doInBackground() throws Exception {
-                return new ExcelApplicationParser().parse(file, sheet);
+                // Solo se leen las columnas que coinciden con los atributos del catálogo cargado
+                com.validador.aces.models.Catalog catalog = window.getLoadedCatalog();
+                java.util.Set<String> interest = catalog != null ? catalog.getAllAttributeNames() : null;
+                return new ExcelApplicationParser().parse(file, sheet, interest);
             }
             @Override protected void done() {
                 try {
