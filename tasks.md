@@ -683,39 +683,39 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 
 ### Componente 12: EMPAQUETADO
 
-- [ ] 51. Configurar build.xml (Ant) (TASK-051)
+- [x] 51. Configurar build.xml (Ant) (TASK-051)
   - Descripcion: Configurar script de compilacion con Apache Ant
   - Criterios de Aceptacion:
-    - ⬜ Target para compilar (compile)
-    - ⬜ Target para limpiar (clean)
-    - ⬜ Target para empaquetar JAR (jar)
+    - ✅ Target para compilar (compile)
+    - ✅ Target para limpiar (clean)
+    - ✅ Target para empaquetar JAR (jar)
   - Dependencias: Ninguna
   - Complejidad: 2
   - Prioridad: required
 
-- [ ] 52. Crear archivo de Manifest (TASK-052)
+- [x] 52. Crear archivo de Manifest (TASK-052)
   - Descripcion: Crear MANIFEST.MF para JAR ejecutable
   - Criterios de Aceptacion:
-    - ⬜ Main-Class apuntando a clase launcher
-    - ⬜ Class-Path con todas las dependencias
+    - ✅ Main-Class apuntando a clase launcher
+    - ✅ Class-Path con todas las dependencias
   - Dependencias: TASK-051
   - Complejidad: 1
   - Prioridad: required
 
-- [ ] 53. Crear Launcher (TASK-053)
+- [x] 53. Crear Launcher (TASK-053)
   - Descripcion: Crear clase Launcher para iniciar aplicacion
   - Criterios de Aceptacion:
-    - ⬜ Clase `Launcher` con main() method
-    - ⬜ Inicializar MainWindow
+    - ✅ Clase `Launcher` con main() method
+    - ✅ Inicializar MainWindow
   - Dependencias: TASK-027
   - Complejidad: 1
   - Prioridad: required
 
-- [ ] 54. Empaquetar JAR ejecutable (TASK-054)
+- [x] 54. Empaquetar JAR ejecutable (TASK-054)
   - Descripcion: Compilar y empaquetar aplicacion en JAR
   - Criterios de Aceptacion:
-    - ⬜ Ejecutar: java -jar validador-aces.jar
-    - ⬜ Incluir todas las dependencias en lib/
+    - ✅ Ejecutar: java -jar validador-aces.jar
+    - ✅ Incluir todas las dependencias en lib/
   - Dependencias: TASK-051, TASK-052, TASK-053
   - Complejidad: 1
   - Prioridad: required

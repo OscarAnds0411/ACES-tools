@@ -211,13 +211,17 @@ public class ExcelApplicationParser extends ApplicationParser {
             row.getCellText(2),    // funciona tanto para STRING como para NUMBER
             row.getCellText(3)
         );
-        app.setPartNumber(row.getCellText(4));
-        app.setMfrLabel(row.getCellText(5));
-        app.setPosition(row.getCellText(6));
+        app.setPartNumber(blankToNull(row.getCellText(4)));
+        app.setMfrLabel(blankToNull(row.getCellText(5)));
+        app.setPosition(blankToNull(row.getCellText(6)));
         for (int i = 0; i < attributeHeaders.size(); i++) {
             app.setAttributeValue(attributeHeaders.get(i),
-                row.getCellText(FIRST_ATTRIBUTE_COLUMN + i));
+                blankToNull(row.getCellText(FIRST_ATTRIBUTE_COLUMN + i)));
         }
         return app;
+    }
+
+    private static String blankToNull(String value) {
+        return (value == null || value.trim().isEmpty()) ? null : value;
     }
 }
