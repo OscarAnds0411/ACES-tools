@@ -22,12 +22,14 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 import com.validador.aces.comparison.ComplianceCalculator;
-import com.validador.aces.comparison.ComplianceMetrics;
+import com.validador.aces.comparison.ProductLineSummary;
 import com.validador.aces.models.ComparisonResult;
 
 /**
@@ -56,6 +58,8 @@ public class StatisticsPanel extends JPanel {
     private final JTable            table;
     private final JLabel            lblTitle;
     private final JLabel            lblSummary;
+    private final JTextArea         detailArea = new JTextArea();
+    private Map<String, ProductLineSummary> summaries = new java.util.LinkedHashMap<>();
 
     // ── Constructor ───────────────────────────────────────────────────────
 
@@ -64,8 +68,8 @@ public class StatisticsPanel extends JPanel {
         window.registerPanel(CARD_NAME, this);
 
         tableModel = new DefaultTableModel(
-            new String[]{"Línea de Producto", "Aplicaciones",
-                         "Req. Totales", "Req. Satisfechos", "Compliance %"}, 0) {
+            new String[]{"Línea de Producto", "Aplicaciones", "Requeridos (x/y)",
+                         "Compliance %", "Atributos opcionales", "N° de parte con faltantes"}, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         table    = buildTable();
@@ -77,8 +81,20 @@ public class StatisticsPanel extends JPanel {
         setBackground(MainWindow.WHITE);
         setLayout(new BorderLayout());
         add(buildNorth(),            BorderLayout.NORTH);
-        add(new JScrollPane(table),  BorderLayout.CENTER);
+        detailArea.setEditable(false);
+        detailArea.setLineWrap(true);
+        detailArea.setWrapStyleWord(true);
+        detailArea.setFont(MainWindow.font(Font.PLAIN, 11));
+        detailArea.setText("Seleccione una línea de producto para ver su resumen y los números de parte con faltantes.");
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+            new JScrollPane(table), new JScrollPane(detailArea));
+        split.setResizeWeight(0.6);
+        add(split,                   BorderLayout.CENTER);
         add(buildSouth(),            BorderLayout.SOUTH);
+
+        table.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) showDetail();
+        });
 
         // ── Auto-refresh al hacerse visible ──────────────────────────────
         addComponentListener(new ComponentAdapter() {
@@ -99,47 +115,68 @@ public class StatisticsPanel extends JPanel {
             return;
         }
 
-        Map<String, ComplianceMetrics> metrics = calculator.calculateByProductLine(byLine);
+        summaries = calculator.summarizeByProductLine(byLine);
 
-        // Separar: con errores vs. sin errores
-        List<Object[]> withErrors   = new ArrayList<>();
-        int compliantLines = 0;
+        // Ordenar por compliance ascendente (N/A al final)
+        List<ProductLineSummary> sorted = new ArrayList<>(summaries.values());
+        sorted.sort((x, y) -> Double.compare(
+            x.isApplicable() ? x.getCompliancePercentage() : Double.MAX_VALUE,
+            y.isApplicable() ? y.getCompliancePercentage() : Double.MAX_VALUE));
 
-        for (Map.Entry<String, ComplianceMetrics> e : metrics.entrySet()) {
-            ComplianceMetrics m = e.getValue();
-            if (m.getUnmetRequiredAttributes() > 0) {
-                int appCount = byLine.get(e.getKey()).size();
-                withErrors.add(new Object[]{
-                    e.getKey(),
-                    appCount,
-                    m.getTotalRequiredAttributes(),
-                    m.getSatisfiedRequiredAttributes(),
-                    String.format("%.1f%%", m.getCompliancePercentage())
+        int incomplete = 0, na = 0, withGaps = 0;
+        int shown = Math.min(sorted.size(), MAX_ROWS);
+        for (int i = 0; i < sorted.size(); i++) {
+            ProductLineSummary m = sorted.get(i);
+            if (!m.isApplicable()) na++;
+            else if (!m.hasAllRequired()) incomplete++;
+            if (!m.getPartNumbersWithGaps().isEmpty()) withGaps++;
+            if (i < shown) {
+                tableModel.addRow(new Object[]{
+                    m.getProductLineName(),
+                    m.getApplicationCount(),
+                    m.getRequiredFraction(),
+                    m.getComplianceLabel(),
+                    m.getOptionalAttributesText(),
+                    m.getPartNumbersWithGaps().size() + " de " + m.getPartNumberCount()
                 });
-            } else {
-                compliantLines++;
             }
         }
 
-        // Ordenar por compliance ascendente
-        withErrors.sort((a, b) -> {
-            double ca = parseCompliance((String) a[4]);
-            double cb = parseCompliance((String) b[4]);
-            return Double.compare(ca, cb);
-        });
+        lblTitle.setText(incomplete == 0
+            ? "  ✔  Todas las líneas con atributos requeridos los contienen completos."
+            : "  " + fmt(incomplete) + " líneas no contienen todos sus atributos requeridos");
+        lblTitle.setForeground(incomplete == 0 ? MainWindow.SCI_BLUE : MainWindow.MINE_SHAFT);
+        lblSummary.setText("  " + fmt(sorted.size()) + " líneas auditadas; "
+            + fmt(withGaps) + " con números de parte a los que les falta algún atributo"
+            + (na > 0 ? "; " + fmt(na) + " sin atributos requeridos (N/A)." : "."));
 
-        int shown = Math.min(withErrors.size(), MAX_ROWS);
-        for (int i = 0; i < shown; i++) tableModel.addRow(withErrors.get(i));
+        if (!sorted.isEmpty()) table.setRowSelectionInterval(0, 0);
+    }
 
-        // Resumen
-        String title = withErrors.isEmpty()
-            ? "  ✔  Todas las líneas de producto cumplen con los atributos requeridos."
-            : "  " + fmt(shown) + " líneas con atributos faltantes"
-                + (withErrors.size() > MAX_ROWS ? "  (mostrando primeras " + fmt(MAX_ROWS) + ")" : "");
-        lblTitle.setText(title);
-        lblTitle.setForeground(withErrors.isEmpty() ? MainWindow.SCI_BLUE : MainWindow.MINE_SHAFT);
+    /** Muestra la frase de auditoría y los números de parte con faltantes de la línea seleccionada. */
+    private void showDetail() {
+        int row = table.getSelectedRow();
+        if (row < 0) return;
+        ProductLineSummary m = summaries.get((String) tableModel.getValueAt(table.convertRowIndexToModel(row), 0));
+        if (m == null) return;
 
-        lblSummary.setText("  " + fmt(compliantLines) + " líneas adicionales con 100% compliance no se muestran.");
+        StringBuilder sb = new StringBuilder(m.describe()).append("\n\n");
+        int limit = 500, n = 0;
+        for (Map.Entry<String, ProductLineSummary.PartNumberGap> e : m.getPartNumbersWithGaps().entrySet()) {
+            if (n++ >= limit) {
+                sb.append("… y ").append(fmt(m.getPartNumbersWithGaps().size() - limit))
+                  .append(" más (todos están en el reporte Excel).\n");
+                break;
+            }
+            sb.append(e.getKey());
+            if (!e.getValue().getMissingRequired().isEmpty())
+                sb.append("  |  requeridos faltantes: ").append(String.join(", ", e.getValue().getMissingRequired()));
+            if (!e.getValue().getMissingOptional().isEmpty())
+                sb.append("  |  opcionales faltantes: ").append(String.join(", ", e.getValue().getMissingOptional()));
+            sb.append('\n');
+        }
+        detailArea.setText(sb.toString());
+        detailArea.setCaretPosition(0);
     }
 
     // ── Layout ────────────────────────────────────────────────────────────
@@ -200,7 +237,8 @@ public class StatisticsPanel extends JPanel {
         t.getColumnModel().getColumn(1).setPreferredWidth(100);
         t.getColumnModel().getColumn(2).setPreferredWidth(100);
         t.getColumnModel().getColumn(3).setPreferredWidth(120);
-        t.getColumnModel().getColumn(4).setPreferredWidth(100);
+        t.getColumnModel().getColumn(4).setPreferredWidth(240);
+        t.getColumnModel().getColumn(5).setPreferredWidth(140);
 
         // Colorear columna Compliance %
         DefaultTableCellRenderer compRenderer = new DefaultTableCellRenderer() {
@@ -209,8 +247,10 @@ public class StatisticsPanel extends JPanel {
                     JTable tbl, Object val, boolean sel, boolean foc, int r, int c) {
                 super.getTableCellRendererComponent(tbl, val, sel, foc, r, c);
                 if (!sel && val != null) {
-                    double v = parseCompliance(val.toString());
-                    setForeground(v < 50 ? MainWindow.C_ERROR
+                    String txt = val.toString();
+                    double v = parseCompliance(txt);
+                    setForeground("N/A".equals(txt) ? MainWindow.MID_GRAY
+                                : v < 50 ? MainWindow.C_ERROR
                                 : v < 100 ? MainWindow.FLUSH_ORANGE
                                 : MainWindow.SCI_BLUE);
                     setFont(MainWindow.font(Font.BOLD, 11));
@@ -219,13 +259,13 @@ public class StatisticsPanel extends JPanel {
                 return this;
             }
         };
-        t.getColumnModel().getColumn(4).setCellRenderer(compRenderer);
+        t.getColumnModel().getColumn(3).setCellRenderer(compRenderer);
 
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         t.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
         t.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
-        t.getColumnModel().getColumn(3).setCellRenderer(centerRenderer);
+        t.getColumnModel().getColumn(5).setCellRenderer(centerRenderer);
         return t;
     }
 

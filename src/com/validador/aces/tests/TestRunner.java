@@ -65,6 +65,7 @@ public class TestRunner {
 
         // TASK-047
         runSuite("[TASK-047] ReportCompletenessTest", ReportCompletenessTest.class);
+        runSuite("ProductLineSummaryTest", ProductLineSummaryTest.class);
 
         // Resumen final
         System.out.println();

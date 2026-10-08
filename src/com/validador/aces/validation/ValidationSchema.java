@@ -31,6 +31,7 @@ public class ValidationSchema {
     private final ProductLine productLine;
     private final List<Attribute> requiredAttributes;
     private final List<Attribute> optionalAttributes;
+    private final List<String> optionalAttributeNames;
 
     /**
      * Construye el esquema de validación a partir de la línea de producto
@@ -58,6 +59,9 @@ public class ValidationSchema {
         }
         this.requiredAttributes = Collections.unmodifiableList(required);
         this.optionalAttributes = Collections.unmodifiableList(optional);
+        List<String> optionalNames = new ArrayList<>();
+        for (Attribute attribute : optional) optionalNames.add(attribute.getName());
+        this.optionalAttributeNames = Collections.unmodifiableList(optionalNames);
     }
 
     /** @return la línea de producto representada por este esquema. */
@@ -73,6 +77,33 @@ public class ValidationSchema {
     /** @return lista no modificable de atributos opcionales de la línea de producto. */
     public List<Attribute> getOptionalAttributes() {
         return optionalAttributes;
+    }
+
+    /** @return nombres (no modificable, compartido) de los atributos opcionales de la línea. */
+    public List<String> getOptionalAttributeNames() {
+        return optionalAttributeNames;
+    }
+
+    /**
+     * Atributos opcionales que la aplicación no trae (valor null o en blanco).
+     * No son errores: sirven para informar qué tan completa viene la aplicación.
+     *
+     * @param application aplicación ACES a revisar
+     * @return nombres de los opcionales ausentes (lista vacía si trae todos)
+     * @throws IllegalArgumentException si {@code application} es null
+     */
+    public List<String> findMissingOptionalAttributes(Application application) {
+        if (application == null) {
+            throw new IllegalArgumentException("Application no puede ser null");
+        }
+        List<String> missing = new ArrayList<>();
+        for (Attribute attribute : optionalAttributes) {
+            Object value = application.getAttributeValue(attribute.getName());
+            boolean blank = value == null
+                || (value instanceof String && ((String) value).trim().isEmpty());
+            if (blank) missing.add(attribute.getName());
+        }
+        return missing;
     }
 
     /**

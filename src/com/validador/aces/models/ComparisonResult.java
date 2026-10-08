@@ -23,6 +23,9 @@ public class ComparisonResult implements Serializable {
     private List<ValidationError> errors;
     private List<ValidationError> warnings;
     private LocalDateTime comparisonDate;
+    private String partNumber;
+    private List<String> optionalAttributeNames = Collections.emptyList();
+    private List<String> missingOptionalAttributes = Collections.emptyList();
 
     /**
      * Constructor con parámetros obligatorios.
@@ -123,6 +126,19 @@ public class ComparisonResult implements Serializable {
     }
 
     /**
+     * Indica si el porcentaje de cumplimiento tiene sentido: es falso cuando no hay
+     * atributos requeridos que evaluar (el resultado es "N/A", no 0 % ni 100 %).
+     */
+    public boolean isApplicable() {
+        return totalAttributes > 0;
+    }
+
+    /** @return el porcentaje con un decimal (ej. "87.5%"), o "N/A" si no es aplicable */
+    public String getComplianceLabel() {
+        return isApplicable() ? String.format("%.1f%%", getCompliancePercentage()) : "N/A";
+    }
+
+    /**
      * Obtiene el número total de errores.
      * 
      * @return cantidad de errores
@@ -220,6 +236,33 @@ public class ComparisonResult implements Serializable {
 
     public void setComparisonDate(LocalDateTime comparisonDate) {
         this.comparisonDate = comparisonDate != null ? comparisonDate : LocalDateTime.now();
+    }
+
+    /** @return número de parte de la aplicación evaluada, o null si no lo tiene */
+    public String getPartNumber() {
+        return partNumber;
+    }
+
+    public void setPartNumber(String partNumber) {
+        this.partNumber = partNumber;
+    }
+
+    /** @return nombres de los atributos opcionales de la línea de producto (lista compartida, no modificable) */
+    public List<String> getOptionalAttributeNames() {
+        return optionalAttributeNames;
+    }
+
+    public void setOptionalAttributeNames(List<String> names) {
+        this.optionalAttributeNames = names == null ? Collections.<String>emptyList() : names;
+    }
+
+    /** @return atributos opcionales que esta aplicación no trae (vacío o null en el Excel) */
+    public List<String> getMissingOptionalAttributes() {
+        return missingOptionalAttributes;
+    }
+
+    public void setMissingOptionalAttributes(List<String> names) {
+        this.missingOptionalAttributes = names == null ? Collections.<String>emptyList() : names;
     }
 
     @Override

@@ -102,7 +102,7 @@ public class ExcelExporter {
         ws.value(3, 0, "Catálogo");     ws.value(3, 1, result.getCatalogName());
         ws.value(4, 0, "Fecha");        ws.value(4, 1, LocalDateTime.now().format(DATE_FORMAT));
         ws.value(5, 0, "Compliance");   ws.value(5, 1,
-            String.format("%.1f%%", result.getCompliancePercentage()));
+            result.getComplianceLabel());
 
         // Estilo de etiquetas de metadata
         for (int r = 1; r <= 5; r++) {

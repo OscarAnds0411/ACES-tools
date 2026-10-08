@@ -67,7 +67,7 @@ public abstract class ReportGenerator {
         section.addRow(buildRow("Total de atributos requeridos", String.valueOf(result.getTotalAttributes())));
         section.addRow(buildRow("Atributos satisfechos", String.valueOf(result.getValidAttributes())));
         section.addRow(buildRow("Atributos incumplidos", String.valueOf(result.getInvalidAttributes())));
-        section.addRow(buildRow("Compliance", String.format("%.1f%%", result.getCompliancePercentage())));
+        section.addRow(buildRow("Compliance", result.getComplianceLabel()));
         section.addRow(buildRow("Total de errores", String.valueOf(result.getErrorCount())));
         section.addRow(buildRow("Total de advertencias", String.valueOf(result.getWarningCount())));
 

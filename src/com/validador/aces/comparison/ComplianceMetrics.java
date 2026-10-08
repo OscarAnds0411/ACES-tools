@@ -62,6 +62,16 @@ public class ComplianceMetrics {
             : Collections.unmodifiableList(new ArrayList<>(unmetAttributeNames));
     }
 
+    /** @return false si no había atributos requeridos que evaluar (el cumplimiento es "N/A"). */
+    public boolean isApplicable() {
+        return totalRequiredAttributes > 0;
+    }
+
+    /** @return el porcentaje con un decimal (ej. "87.5%"), o "N/A" si no es aplicable */
+    public String getComplianceLabel() {
+        return isApplicable() ? String.format("%.1f%%", compliancePercentage) : "N/A";
+    }
+
     /** @return nombre de la aplicación o etiqueta del grupo agregado. */
     public String getSubjectName() {
         return subjectName;

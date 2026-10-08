@@ -229,6 +229,7 @@ public class Comparator {
 
         ComparisonResult result = new ComparisonResult(application.getName(), catalog.getName());
         result.addErrors(allErrors);
+        result.setPartNumber(application.getPartNumber());
 
         if (line != null && schema != null) {
             int total = schema.getRequiredAttributes().size();
@@ -236,6 +237,8 @@ public class Comparator {
             result.setTotalAttributes(total);
             result.setInvalidAttributes(missingCount);
             result.setValidAttributes(total - missingCount);
+            result.setOptionalAttributeNames(schema.getOptionalAttributeNames());
+            result.setMissingOptionalAttributes(schema.findMissingOptionalAttributes(application));
         } else {
             result.setTotalAttributes(0);
             result.setValidAttributes(0);
@@ -274,6 +277,7 @@ public class Comparator {
 
         ComparisonResult result = new ComparisonResult(application.getName(), catalog.getName());
         result.addErrors(allErrors);
+        result.setPartNumber(application.getPartNumber());
 
         if (line != null) {
             ValidationSchema schema = new ValidationSchema(line);
@@ -282,6 +286,8 @@ public class Comparator {
             result.setTotalAttributes(total);
             result.setInvalidAttributes(missingCount);
             result.setValidAttributes(total - missingCount);
+            result.setOptionalAttributeNames(schema.getOptionalAttributeNames());
+            result.setMissingOptionalAttributes(schema.findMissingOptionalAttributes(application));
         } else {
             result.setTotalAttributes(0);
             result.setValidAttributes(0);
@@ -308,8 +314,8 @@ public class Comparator {
     private void recordSingleAudit(Application application, ComparisonResult result, long durationMillis) {
         String details = "Comparación de aplicación: " + application.getName();
         String resultSummary = String.format(
-            "Compliance: %.1f%%, Errores: %d, Advertencias: %d",
-            result.getCompliancePercentage(), result.getErrorCount(), result.getWarningCount());
+            "Compliance: %s, Errores: %d, Advertencias: %d",
+            result.getComplianceLabel(), result.getErrorCount(), result.getWarningCount());
 
         AuditReport report = new AuditReport(user, AuditAction.COMPARISON, details, resultSummary);
         report.setDurationMillis(durationMillis);

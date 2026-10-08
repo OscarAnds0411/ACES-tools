@@ -359,12 +359,11 @@ public class ValidationPanel extends JPanel {
     private void populateUI(List<ComparisonResult> results, List<Application> apps) {
         int total = results.size(), compliant = 0, withErrors = 0, unclassified = 0;
         double sumCompliance = 0;
+        int applicableCount = 0;
 
         List<Object[]> rows = new ArrayList<>();
         for (int i = 0; i < results.size(); i++) {
             ComparisonResult r = results.get(i);
-            sumCompliance += r.getCompliancePercentage();
-
             boolean isUnclassified = !r.getWarnings().isEmpty() &&
                 r.getWarnings().stream().anyMatch(w ->
                     AttributeValidator.PRODUCT_LINE_NOT_FOUND.equals(w.getCode()));
@@ -379,7 +378,12 @@ public class ValidationPanel extends JPanel {
                         "Sin clasificar"
                     });
                 }
+            } else if (!r.isApplicable()) {
+                // Sin atributos requeridos: N/A, no cuenta en promedio ni en 100 % compliant
+                continue;
             } else if (r.getErrorCount() > 0) {
+                sumCompliance += r.getCompliancePercentage();
+                applicableCount++;
                 withErrors++;
                 for (ValidationError err : r.getErrors()) {
                     if (!AttributeValidator.MISSING_REQUIRED_ATTRIBUTE.equals(err.getCode())) continue;
@@ -393,18 +397,21 @@ public class ValidationPanel extends JPanel {
                     }
                 }
             } else {
+                sumCompliance += r.getCompliancePercentage();
+                applicableCount++;
                 compliant++;
             }
         }
 
-        double avg = total > 0 ? sumCompliance / total : 0;
+        // Promedio solo sobre aplicaciones clasificadas y con atributos requeridos
+        String avg = applicableCount > 0 ? String.format("%.1f%%", sumCompliance / applicableCount) : "N/A";
 
         // Métricas
         metricTotal.setText(fmt(total));
         metricCompliant.setText(fmt(compliant));
         metricErrors.setText(fmt(withErrors));
         metricUnclassified.setText(fmt(unclassified));
-        metricAvg.setText(String.format("%.1f%%", avg));
+        metricAvg.setText(avg);
 
         // Tabla
         for (Object[] row : rows) tableModel.addRow(row);

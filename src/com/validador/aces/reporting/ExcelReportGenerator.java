@@ -15,7 +15,7 @@ import org.dhatim.fastexcel.Workbook;
 import org.dhatim.fastexcel.Worksheet;
 
 import com.validador.aces.comparison.ComplianceCalculator;
-import com.validador.aces.comparison.ComplianceMetrics;
+import com.validador.aces.comparison.ProductLineSummary;
 import com.validador.aces.models.ComparisonResult;
 import com.validador.aces.models.ValidationError;
 import com.validador.aces.validation.AttributeValidator;
@@ -61,6 +61,9 @@ public class ExcelReportGenerator extends ReportGenerator {
 
     /** Título de la sección de listado de atributos faltantes del lote. */
     public static final String MISSING_ATTRIBUTES_SECTION = "Atributos Faltantes por Aplicacion";
+
+    /** Título de la sección con los números de parte a los que les falta algún atributo. */
+    public static final String PART_NUMBER_GAPS_SECTION = "Numeros de Parte con Faltantes";
 
     private static final DateTimeFormatter DATE_FORMAT =
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -122,6 +125,7 @@ public class ExcelReportGenerator extends ReportGenerator {
         report.addSection(buildBatchSummarySection(resultsByProductLine));
         report.addSection(buildBatchMissingAttributesSection(resultsByProductLine));
         report.addSection(buildProductLineStatsSection(resultsByProductLine));
+        report.addSection(buildPartNumberGapsSection(resultsByProductLine));
         return report;
     }
 
@@ -134,6 +138,7 @@ public class ExcelReportGenerator extends ReportGenerator {
         int fullCompliance = 0;
         int withMissing = 0;
         int unclassified = 0;
+        int notApplicable = 0;
         double complianceSum = 0.0;
         int complianceCounted = 0;
 
@@ -142,6 +147,10 @@ public class ExcelReportGenerator extends ReportGenerator {
                 totalApps++;
                 if (isUnclassified(r)) {
                     unclassified++;
+                    continue;
+                }
+                if (!r.isApplicable()) {
+                    notApplicable++;
                     continue;
                 }
                 complianceSum += r.getCompliancePercentage();
@@ -154,7 +163,8 @@ public class ExcelReportGenerator extends ReportGenerator {
             }
         }
 
-        double averageCompliance = complianceCounted == 0 ? 0.0 : complianceSum / complianceCounted;
+        String averageCompliance = complianceCounted == 0
+            ? "N/A" : String.format("%.1f%%", complianceSum / complianceCounted);
 
         List<String> headers = new ArrayList<>();
         headers.add("Metrica");
@@ -165,8 +175,9 @@ public class ExcelReportGenerator extends ReportGenerator {
         section.addRow(row("Aplicaciones con 100% compliance", String.valueOf(fullCompliance)));
         section.addRow(row("Aplicaciones con atributos faltantes", String.valueOf(withMissing)));
         section.addRow(row("Aplicaciones sin clasificar (producto no hallado)", String.valueOf(unclassified)));
+        section.addRow(row("Aplicaciones sin atributos requeridos (N/A)", String.valueOf(notApplicable)));
         section.addRow(row("Lineas de producto auditadas", String.valueOf(resultsByProductLine.size())));
-        section.addRow(row("Compliance promedio (clasificadas)", String.format("%.1f%%", averageCompliance)));
+        section.addRow(row("Compliance promedio (clasificadas, con requisitos)", averageCompliance));
         return section;
     }
 
@@ -203,34 +214,67 @@ public class ExcelReportGenerator extends ReportGenerator {
     }
 
     /**
-     * Construye la sección de estadísticas agregadas por línea de producto,
-     * delegando el cálculo en {@link ComplianceCalculator#calculateByProductLine(Map)}.
+     * Construye la sección por línea de producto: requeridos satisfechos/totales
+     * (en celdas), atributos opcionales de la línea, cuántos números de parte
+     * tienen faltantes y una frase descriptiva de la auditoría.
      */
     private ReportSection buildProductLineStatsSection(
             Map<String, List<ComparisonResult>> resultsByProductLine) {
         List<String> headers = new ArrayList<>();
         headers.add("Linea de Producto");
         headers.add("Aplicaciones");
-        headers.add("Req. Totales");
-        headers.add("Req. Satisfechos");
+        headers.add("Requeridos (satisfechos/totales)");
         headers.add("Compliance %");
+        headers.add("Atributos Opcionales");
+        headers.add("Numeros de Parte con Faltantes");
+        headers.add("Resumen");
 
         ReportSection section = new ReportSection(PRODUCT_LINE_STATS_SECTION, headers);
 
-        Map<String, ComplianceMetrics> metricsByLine =
-            complianceCalculator.calculateByProductLine(resultsByProductLine);
+        Map<String, ProductLineSummary> summaries =
+            complianceCalculator.summarizeByProductLine(resultsByProductLine);
 
-        for (Map.Entry<String, ComplianceMetrics> entry : metricsByLine.entrySet()) {
-            String productLine = entry.getKey();
-            ComplianceMetrics m = entry.getValue();
-            int appCount = resultsByProductLine.get(productLine).size();
+        for (ProductLineSummary m : summaries.values()) {
             section.addRow(row(
-                productLine,
-                String.valueOf(appCount),
-                String.valueOf(m.getTotalRequiredAttributes()),
-                String.valueOf(m.getSatisfiedRequiredAttributes()),
-                String.format("%.1f%%", m.getCompliancePercentage())
+                m.getProductLineName(),
+                String.valueOf(m.getApplicationCount()),
+                m.getRequiredFraction(),
+                m.getComplianceLabel(),
+                m.getOptionalAttributesText(),
+                m.getPartNumbersWithGaps().size() + " de " + m.getPartNumberCount(),
+                m.describe()
             ));
+        }
+        return section;
+    }
+
+    /**
+     * Construye la sección con un renglón por número de parte al que le falta
+     * algún atributo, indicando cuáles son requeridos y cuáles opcionales.
+     */
+    private ReportSection buildPartNumberGapsSection(
+            Map<String, List<ComparisonResult>> resultsByProductLine) {
+        List<String> headers = new ArrayList<>();
+        headers.add("Linea de Producto");
+        headers.add("Numero de Parte");
+        headers.add("Requeridos Faltantes");
+        headers.add("Opcionales Faltantes");
+
+        ReportSection section = new ReportSection(PART_NUMBER_GAPS_SECTION, headers);
+        boolean any = false;
+        for (ProductLineSummary m : complianceCalculator.summarizeByProductLine(resultsByProductLine).values()) {
+            for (Map.Entry<String, ProductLineSummary.PartNumberGap> e : m.getPartNumbersWithGaps().entrySet()) {
+                section.addRow(row(
+                    m.getProductLineName(),
+                    e.getKey(),
+                    e.getValue().getMissingRequired().isEmpty() ? "-" : String.join(", ", e.getValue().getMissingRequired()),
+                    e.getValue().getMissingOptional().isEmpty() ? "-" : String.join(", ", e.getValue().getMissingOptional())
+                ));
+                any = true;
+            }
+        }
+        if (!any) {
+            section.addRow(row("-", "-", "-", "Todos los numeros de parte tienen sus atributos completos"));
         }
         return section;
     }

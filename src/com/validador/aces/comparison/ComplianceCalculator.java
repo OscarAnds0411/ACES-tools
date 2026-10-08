@@ -112,6 +112,36 @@ public class ComplianceCalculator {
     }
 
     /**
+     * Resume cada línea de producto: requeridos satisfechos/totales (en celdas),
+     * atributos opcionales de la línea y números de parte con atributos faltantes.
+     *
+     * @param resultsByProductLine mapa de nombre de línea de producto a sus resultados
+     * @return resumen por línea, en el mismo orden del mapa de entrada
+     * @throws IllegalArgumentException si {@code resultsByProductLine} es null
+     */
+    public Map<String, ProductLineSummary> summarizeByProductLine(
+            Map<String, List<ComparisonResult>> resultsByProductLine) {
+        if (resultsByProductLine == null) {
+            throw new IllegalArgumentException("resultsByProductLine no puede ser null");
+        }
+        Map<String, ProductLineSummary> summaries = new LinkedHashMap<>();
+        for (Map.Entry<String, List<ComparisonResult>> entry : resultsByProductLine.entrySet()) {
+            ProductLineSummary summary = new ProductLineSummary(entry.getKey());
+            for (ComparisonResult r : entry.getValue()) {
+                summary.addApplication(
+                    r.getPartNumber(),
+                    r.getTotalAttributes(),
+                    r.getValidAttributes(),
+                    r.getOptionalAttributeNames(),
+                    identifyUnmetRequiredAttributes(r),
+                    r.getMissingOptionalAttributes());
+            }
+            summaries.put(entry.getKey(), summary);
+        }
+        return summaries;
+    }
+
+    /**
      * Extrae los nombres de los atributos requeridos incumplidos de un
      * resultado de comparación, a partir de los errores con código
      * {@link AttributeValidator#MISSING_REQUIRED_ATTRIBUTE}.

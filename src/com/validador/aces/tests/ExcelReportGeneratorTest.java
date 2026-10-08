@@ -94,8 +94,8 @@ public final class ExcelReportGeneratorTest {
         Map<String, List<ComparisonResult>> byLine = new LinkedHashMap<>();
         byLine.put("TestProduct", Collections.singletonList(resultWithError()));
         Report report = gen.generateBatchReport(byLine);
-        Assert.assertEquals(3, report.getSections().size(),
-            "Reporte batch debe tener 3 secciones: Resumen, Faltantes, Estadísticas");
+        Assert.assertEquals(4, report.getSections().size(),
+            "Reporte batch debe tener 4 secciones: Resumen, Faltantes, Estadísticas, Números de parte");
     }
 
     // ── Test 5: writeReportToFile crea un Excel válido y legible ──────────

@@ -59,8 +59,8 @@ public class ReportPrinter {
         // Resumen ejecutivo
         sb.append("RESUMEN EJECUTIVO").append('\n');
         sb.append(SEP_THIN).append('\n');
-        sb.append(String.format("  Compliance              : %.1f%%%n",
-            result.getCompliancePercentage()));
+        sb.append(String.format("  Compliance              : %s%n",
+            result.getComplianceLabel()));
         sb.append(String.format("  Atributos requeridos    : %d%n",
             result.getTotalAttributes()));
         sb.append(String.format("  Atributos satisfechos   : %d%n",
@@ -129,9 +129,13 @@ public class ReportPrinter {
         int fullCompliance = 0;
         int withErrors = 0;
         double complianceSum = 0.0;
+        int applicable = 0;
 
         for (ComparisonResult r : results) {
-            complianceSum += r.getCompliancePercentage();
+            if (r.isApplicable()) {
+                complianceSum += r.getCompliancePercentage();
+                applicable++;
+            }
             if (r.getErrorCount() == 0 && r.getWarningCount() == 0) {
                 fullCompliance++;
             }
@@ -140,14 +144,14 @@ public class ReportPrinter {
             }
         }
 
-        double avg = total == 0 ? 0.0 : complianceSum / total;
+        String avg = applicable == 0 ? "N/A" : String.format("%.1f%%", complianceSum / applicable);
 
         StringBuilder sb = new StringBuilder();
         sb.append(SEP_THICK).append('\n');
         sb.append("  RESUMEN DE LOTE — AUDITORÍA ACES\n");
         sb.append(SEP_THICK).append('\n');
         sb.append(String.format("  Aplicaciones auditadas   : %d%n", total));
-        sb.append(String.format("  Compliance promedio      : %.1f%%%n", avg));
+        sb.append(String.format("  Compliance promedio      : %s%n", avg));
         sb.append(String.format("  Con 100%% compliance      : %d%n", fullCompliance));
         sb.append(String.format("  Con errores              : %d%n", withErrors));
         sb.append(SEP_THICK).append('\n');
