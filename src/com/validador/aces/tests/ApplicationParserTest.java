@@ -23,6 +23,7 @@ public final class ApplicationParserTest {
     // ── Test 1: parsear archivo válido ────────────────────────────────────
 
     public static void testParseValidFile_returnsNonEmptyList() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<Application> apps = new ExcelApplicationParser().parse(ACES_PATH);
         Assert.assertNotNull(apps, "La lista no debe ser null");
         Assert.assertTrue(apps.size() >= EXPECTED_MIN_APPS,
@@ -40,6 +41,7 @@ public final class ApplicationParserTest {
     // ── Test 3: lanzar excepción con hoja incorrecta ──────────────────────
 
     public static void testParseWrongSheetName_throwsParseException() {
+        Assert.assumeFileExists(ACES_PATH);
         Assert.assertThrows(ParseException.class,
             () -> new ExcelApplicationParser().parse(new File(ACES_PATH), "HojaFantasma"),
             "Debe lanzar ParseException para hoja inexistente");
@@ -48,6 +50,7 @@ public final class ApplicationParserTest {
     // ── Test 4: metadata de la primera aplicación ─────────────────────────
 
     public static void testFirstApplication_hasMakeAndModel() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<Application> apps = new ExcelApplicationParser().parse(ACES_PATH);
         Application first = apps.get(0);
         Assert.assertNotNull(first.getMake(),  "Make no debe ser null");
@@ -59,6 +62,7 @@ public final class ApplicationParserTest {
     // ── Test 5: celdas vacías preservadas como null ───────────────────────
 
     public static void testEmptyCells_preservedAsNull() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<Application> apps = new ExcelApplicationParser().parse(ACES_PATH);
         // Buscar alguna aplicación que tenga al menos un atributo null
         boolean foundNull = false;
@@ -76,6 +80,7 @@ public final class ApplicationParserTest {
     // ── Test 6: readSheetNames incluye la hoja esperada ───────────────────
 
     public static void testReadSheetNames_includesApplicationsSheet() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<String> sheets = ExcelApplicationParser.readSheetNames(new File(ACES_PATH));
         Assert.assertTrue(sheets.contains(ExcelApplicationParser.DEFAULT_SHEET_NAME),
             "La lista de hojas debe contener '" + ExcelApplicationParser.DEFAULT_SHEET_NAME + "'");
@@ -84,6 +89,7 @@ public final class ApplicationParserTest {
     // ── Test 7: parse con hoja explícita ─────────────────────────────────
 
     public static void testParseWithExplicitSheetName_works() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<Application> apps = new ExcelApplicationParser()
             .parse(new File(ACES_PATH), ExcelApplicationParser.DEFAULT_SHEET_NAME);
         Assert.assertTrue(apps.size() >= EXPECTED_MIN_APPS,
@@ -93,6 +99,7 @@ public final class ApplicationParserTest {
     // ── Test 8: número de atributos técnicos razonable ───────────────────
 
     public static void testApplication_hasReasonableAttributeCount() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<Application> apps = new ExcelApplicationParser().parse(ACES_PATH);
         Application first = apps.get(0);
         // El ACES real tiene 94 - 7 = 87 columnas de atributos técnicos

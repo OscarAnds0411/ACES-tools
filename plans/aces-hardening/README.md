@@ -30,7 +30,7 @@ is available (`C:\opt\ant\bin\ant.bat`).
 
 | Plan | Title | Effort | Depends on | Status |
 |------|-------|--------|------------|--------|
-| [001](001-reliable-test-gate.md) | Make the test suite a reliable gate | S–M | — | TODO |
+| [001](001-reliable-test-gate.md) | Make the test suite a reliable gate | S–M | — | DONE |
 | [002](002-clone-buildable-and-claude-md.md) | Fresh clone builds; `CLAUDE.md` with verified commands | S | 001 | TODO |
 | [003](003-parser-correctness.md) | Parsers read catalog/ACES faithfully | M | 001 | TODO |
 | [004](004-comparator-single-path.md) | Resolve product line once; fix duplicate-name divergence | M | 001 (run after 003) | TODO |
@@ -63,8 +63,12 @@ SUPERSEDED (one-line pointer to what replaced it)
 
 (Newest first. A few lines per entry, hard cap.)
 
-- **2026-10-09**: Effort planned from the `improve` audit; no plan executed yet.
-  Next: 001.
+- **2026-10-09**: Plan 001 closed (changes in working tree, not committed).
+  Deviations: 19 real-data tests guarded (plan estimated ~15); fresh-clone
+  simulation = 76 passed / 19 skipped / 0 failed; negative checks (failing test,
+  empty suite) were run on a temp copy of `src`, not in the repo; `ant test`
+  verified (Ant 1.10.18, BUILD SUCCESSFUL, 95/95). Next: 002.
+- **2026-10-09**: Effort planned from the `improve` audit.
 
 ## Considered and rejected
 

@@ -111,13 +111,13 @@
         <echo message="JavaDoc generado en: ${docs.dir}"/>
     </target>
     
-    <!-- Target: Test (opcional) -->
+    <!-- Target: Test (falla el build si algún test falla; los tests de datos reales se omiten si faltan los archivos) -->
     <target name="test" depends="compile" description="Ejecutar suite de tests unitarios y de round-trip">
         <echo message="Ejecutando suite de tests..."/>
         <java classname="com.validador.aces.tests.TestRunner"
               fork="true"
               dir="${basedir}"
-              failonerror="false">
+              failonerror="true">
             <classpath>
                 <fileset dir="${lib.dir}" includes="*.jar"/>
                 <pathelement location="${bin.dir}"/>

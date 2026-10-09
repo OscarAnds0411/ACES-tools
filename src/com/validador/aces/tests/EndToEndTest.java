@@ -37,6 +37,7 @@ public final class EndToEndTest {
     // ── Test 1: cargar catálogo real ──────────────────────────────────────
 
     public static void testLoadRealCatalog_succeeds() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         Assert.assertTrue(catalog.getProductLineCount() > 30_000,
             "El catálogo real debe tener > 30 000 líneas de producto");
@@ -45,6 +46,7 @@ public final class EndToEndTest {
     // ── Test 2: cargar ACES real ──────────────────────────────────────────
 
     public static void testLoadRealAces_succeeds() throws Exception {
+        Assert.assumeFileExists(ACES_PATH);
         List<Application> apps = new ExcelApplicationParser().parse(ACES_PATH);
         Assert.assertTrue(apps.size() > 80_000,
             "El ACES real debe tener > 80 000 aplicaciones");
@@ -53,6 +55,8 @@ public final class EndToEndTest {
     // ── Test 3: ejecutar validación completa ──────────────────────────────
 
     public static void testRunComparison_completesWithoutException() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
+        Assert.assumeFileExists(ACES_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         List<Application> all  = new ExcelApplicationParser().parse(ACES_PATH);
         List<Application> sample = all.subList(0, Math.min(SAMPLE_SIZE, all.size()));
@@ -65,6 +69,8 @@ public final class EndToEndTest {
     // ── Test 4: generar reporte Excel ─────────────────────────────────────
 
     public static void testGenerateReport_createsValidExcelFile() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
+        Assert.assumeFileExists(ACES_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         List<Application> all    = new ExcelApplicationParser().parse(ACES_PATH);
         List<Application> sample = all.subList(0, Math.min(SAMPLE_SIZE, all.size()));
@@ -100,6 +106,8 @@ public final class EndToEndTest {
     // ── Test 5: archivo ACES original no modificado ───────────────────────
 
     public static void testAcesOriginalNotModified_afterReportGeneration() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
+        Assert.assumeFileExists(ACES_PATH);
         File acesFile = new File(ACES_PATH);
         long sizeBefore = acesFile.length();
 

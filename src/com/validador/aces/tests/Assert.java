@@ -51,6 +51,29 @@ public final class Assert {
         }
     }
 
+    /**
+     * Omite el test actual (no cuenta como fallo) cuando un archivo de datos
+     * reales no existe. Las rutas son relativas al directorio de trabajo
+     * (la raíz del repositorio).
+     */
+    public static void assumeFileExists(String path) {
+        assumeFileExists(new java.io.File(path));
+    }
+
+    public static void assumeFileExists(java.io.File file) {
+        if (!file.isFile())
+            throw new TestSkippedException("falta el archivo de datos reales: " + file.getPath());
+    }
+
+    /** Señal de test omitido; el {@code TestRunner} la cuenta aparte de los fallos. */
+    public static final class TestSkippedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        public TestSkippedException(String reason) {
+            super(reason);
+        }
+    }
+
     @FunctionalInterface
     public interface ThrowingRunnable {
         void run() throws Exception;

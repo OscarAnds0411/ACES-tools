@@ -27,6 +27,7 @@ public final class CatalogParserTest {
     // ── Test 1: parsear archivo válido ────────────────────────────────────
 
     public static void testParseValidFile_returnsNonEmptyCatalog() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         Assert.assertNotNull(catalog, "El catálogo no debe ser null");
         Assert.assertTrue(catalog.getProductLineCount() >= EXPECTED_MIN_PRODUCT_LINES,
@@ -45,6 +46,7 @@ public final class CatalogParserTest {
     // ── Test 3: lanzar excepción con hoja incorrecta ──────────────────────
 
     public static void testParseWrongSheetName_throwsParseException() {
+        Assert.assumeFileExists(CATALOG_PATH);
         Assert.assertThrows(ParseException.class,
             () -> new ExcelCatalogParser().parse(new File(CATALOG_PATH), "HojaQueNoExiste"),
             "Debe lanzar ParseException para hoja inexistente");
@@ -53,6 +55,7 @@ public final class CatalogParserTest {
     // ── Test 4: validar estructura — número de atributos por línea ────────
 
     public static void testStructure_attributeCountPerProductLine() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         ProductLine first = catalog.getProductLines().get(0);
         Assert.assertEquals(EXPECTED_ATTRS_PER_LINE, first.getAttributeCount(),
@@ -62,6 +65,7 @@ public final class CatalogParserTest {
     // ── Test 5: validar estructura — todos los atributos tienen requirement ─
 
     public static void testStructure_allAttributesHaveValidRequirement() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         // Verificar las primeras 100 líneas para no tardar demasiado
         int checked = 0;
@@ -82,6 +86,7 @@ public final class CatalogParserTest {
     // ── Test 6: readSheetNames incluye la hoja esperada ───────────────────
 
     public static void testReadSheetNames_includesExpectedSheet() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         List<String> sheets = ExcelCatalogParser.readSheetNames(new File(CATALOG_PATH));
         Assert.assertTrue(sheets.contains(ExcelCatalogParser.DEFAULT_SHEET_NAME),
             "La lista de hojas debe contener '" + ExcelCatalogParser.DEFAULT_SHEET_NAME + "'");
@@ -90,6 +95,7 @@ public final class CatalogParserTest {
     // ── Test 7: parse con nombre de hoja explícito ────────────────────────
 
     public static void testParseWithExplicitSheetName_works() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         Catalog catalog = new ExcelCatalogParser()
             .parse(new File(CATALOG_PATH), ExcelCatalogParser.DEFAULT_SHEET_NAME);
         Assert.assertTrue(catalog.getProductLineCount() >= EXPECTED_MIN_PRODUCT_LINES,
@@ -99,6 +105,7 @@ public final class CatalogParserTest {
     // ── Test 8: findProductByName funciona correctamente ─────────────────
 
     public static void testCatalog_findProductByName_caseInsensitive() throws Exception {
+        Assert.assumeFileExists(CATALOG_PATH);
         Catalog catalog = new ExcelCatalogParser().parse(CATALOG_PATH);
         ProductLine first = catalog.getProductLines().get(0);
         String name = first.getName();
