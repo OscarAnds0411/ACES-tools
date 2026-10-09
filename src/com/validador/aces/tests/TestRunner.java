@@ -71,6 +71,9 @@ public class TestRunner {
         // Plan 003: regresiones de los parsers
         runSuite("[PLAN-003] ParserRegressionTest", ParserRegressionTest.class);
 
+        // Plan 004: equivalencia compare/compareAll y nombres de línea duplicados
+        runSuite("[PLAN-004] ComparatorEquivalenceTest", ComparatorEquivalenceTest.class);
+
         // Resumen final
         System.out.println();
         System.out.println(sep);

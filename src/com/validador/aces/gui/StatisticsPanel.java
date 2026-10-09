@@ -112,6 +112,9 @@ public class StatisticsPanel extends JPanel {
         if (byLine == null || byLine.isEmpty()) {
             lblTitle.setText("  Sin resultados — ejecute una auditoría primero.");
             lblSummary.setText("");
+            // No dejar a la vista el detalle de una auditoría anterior
+            summaries = new java.util.LinkedHashMap<>();
+            detailArea.setText("Seleccione una línea de producto para ver su resumen y los números de parte con faltantes.");
             return;
         }
 

@@ -576,6 +576,7 @@ public class MainWindow extends JFrame {
     private java.io.File                            loadedAcesFile;
     private java.util.Map<String, java.util.List<com.validador.aces.models.ComparisonResult>> lastComparisonResults;
     private final java.util.List<com.validador.aces.models.AuditReport> auditHistory = new java.util.ArrayList<>();
+    private final java.util.List<Runnable> resultsInvalidatedListeners = new java.util.ArrayList<>();
 
     /**
      * Registra el catálogo cargado y habilita "Ejecutar" si ambos archivos
@@ -584,6 +585,8 @@ public class MainWindow extends JFrame {
      * @param catalog catálogo parseado, o {@code null} para descartar
      */
     public void setLoadedCatalog(com.validador.aces.models.Catalog catalog) {
+        // Cambiar el catálogo deja obsoletos los resultados de la auditoría anterior
+        if (catalog != this.loadedCatalog) invalidateResults();
         this.loadedCatalog = catalog;
         checkCanRun();
     }
@@ -601,7 +604,12 @@ public class MainWindow extends JFrame {
      */
     public void setLoadedApplications(
             java.util.List<com.validador.aces.models.Application> apps) {
+        // Cambiar las aplicaciones deja obsoletos los resultados de la auditoría anterior
+        if (apps != this.loadedApplications) invalidateResults();
         this.loadedApplications = apps;
+        // Si la carga falló (null), el archivo ACES anterior ya no es el cargado:
+        // evitar que el nombre sugerido del reporte salga de un archivo descartado
+        if (apps == null) this.loadedAcesFile = null;
         checkCanRun();
     }
 
@@ -622,6 +630,26 @@ public class MainWindow extends JFrame {
     public java.util.Map<String, java.util.List<com.validador.aces.models.ComparisonResult>>
             getLastComparisonResults() {
         return lastComparisonResults;
+    }
+
+    // ── Invalidación de resultados ────────────────────────────────────────
+
+    /**
+     * Registra un oyente que se ejecuta cuando los resultados de la última
+     * auditoría dejan de ser válidos (se cargó otro catálogo u otro ACES). Los
+     * paneles que muestran resultados lo usan para volver a su estado inicial.
+     * Se invoca siempre en el hilo de Swing, porque los setters de carga se
+     * llaman desde {@code SwingWorker.done()}.
+     */
+    public void addResultsInvalidatedListener(Runnable listener) {
+        resultsInvalidatedListeners.add(listener);
+    }
+
+    private void invalidateResults() {
+        this.lastComparisonResults = null;
+        for (Runnable listener : resultsInvalidatedListeners) {
+            listener.run();
+        }
     }
 
     // ── Historial de auditorías (usado por AuditPanel) ───────────────────

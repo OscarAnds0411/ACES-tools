@@ -1,9 +1,12 @@
 package com.validador.aces.reporting;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -280,12 +283,39 @@ public class ExcelReportGenerator extends ReportGenerator {
     }
 
     /**
+     * Indica si dos archivos son el mismo, aunque se escriban con rutas distintas
+     * (por ejemplo {@code dir\.\a.xlsx} y {@code dir\a.xlsx}). Si ambos existen se
+     * comparan en el sistema de archivos; si alguno no existe (todavía), por su
+     * ruta absoluta normalizada. Sirve para impedir que un reporte se escriba
+     * encima del ACES original.
+     *
+     * @return true si son el mismo archivo; false si no, o si alguno es null
+     */
+    public static boolean isSameFile(File a, File b) {
+        if (a == null || b == null) return false;
+        try {
+            if (a.exists() && b.exists()) {
+                return Files.isSameFile(a.toPath(), b.toPath());
+            }
+        } catch (IOException | SecurityException e) {
+            // Si no se puede comparar en el sistema de archivos, usar la comparación por ruta
+        }
+        return a.toPath().toAbsolutePath().normalize()
+                .equals(b.toPath().toAbsolutePath().normalize());
+    }
+
+    /**
      * Renderiza un {@link Report} a un archivo Excel (.xlsx) con formato
      * visual, en un archivo <strong>separado</strong> del ACES original.
      *
      * <p>El archivo de salida nunca debe ser el ACES original: este método
      * escribe un libro nuevo desde cero. Use {@link #defaultReportFileFor(File)}
-     * para derivar una ruta hermana segura.</p>
+     * para derivar una ruta hermana segura y {@link #isSameFile(File, File)} para
+     * comprobarlo.</p>
+     *
+     * <p>La escritura es atómica: el libro se escribe primero a un archivo
+     * temporal del mismo directorio y luego reemplaza al destino. Si algo falla,
+     * un destino existente queda intacto y no se deja el temporal.</p>
      *
      * @param report     reporte a renderizar
      * @param outputFile archivo de salida (.xlsx), distinto del ACES original
@@ -300,18 +330,39 @@ public class ExcelReportGenerator extends ReportGenerator {
             throw new IllegalArgumentException("outputFile no puede ser null");
         }
 
-        try (OutputStream os = new FileOutputStream(outputFile)) {
-            Workbook workbook = new Workbook(os, "Validador de Atributos ACES", "1.0");
-            Worksheet ws = workbook.newWorksheet(REPORT_SHEET_NAME);
+        // Escritura atómica: se escribe a un temporal del MISMO directorio y solo al
+        // terminar se mueve sobre el destino. Así, si el renderizado o la escritura
+        // fallan, un archivo existente queda intacto en lugar de truncado, y no
+        // queda un reporte a medias.
+        Path target = outputFile.toPath().toAbsolutePath();
+        Path tmp = Files.createTempFile(target.getParent(), "reporte_", ".tmp");
+        boolean moved = false;
+        try {
+            try (OutputStream os = Files.newOutputStream(tmp)) {
+                Workbook workbook = new Workbook(os, "Validador de Atributos ACES", "1.0");
+                Worksheet ws = workbook.newWorksheet(REPORT_SHEET_NAME);
 
-            int currentRow = renderTitle(ws, report);
-            for (ReportSection section : report.getSections()) {
-                currentRow = renderSection(ws, section, currentRow);
-                currentRow++; // fila en blanco entre secciones
+                int currentRow = renderTitle(ws, report);
+                for (ReportSection section : report.getSections()) {
+                    currentRow = renderSection(ws, section, currentRow);
+                    currentRow++; // fila en blanco entre secciones
+                }
+
+                applyColumnWidths(ws);
+                workbook.finish();
             }
 
-            applyColumnWidths(ws);
-            workbook.finish();
+            try {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING,
+                           StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+            moved = true;
+        } finally {
+            if (!moved) {
+                Files.deleteIfExists(tmp);
+            }
         }
     }
 

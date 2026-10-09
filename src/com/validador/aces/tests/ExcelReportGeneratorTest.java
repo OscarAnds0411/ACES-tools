@@ -1,6 +1,9 @@
 package com.validador.aces.tests;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -137,5 +140,178 @@ public final class ExcelReportGeneratorTest {
         Assert.assertThrows(IllegalArgumentException.class,
             () -> new ExcelReportGenerator().writeReportToFile(null, new File("out.xlsx")),
             "Report null debe lanzar IAE");
+    }
+
+    // ── Plan 005: escritura atómica y comparación de archivos ─────────────
+
+    private static final byte[] ORIGINAL_BYTES =
+        "CONTENIDO ORIGINAL QUE NO DEBE PERDERSE".getBytes(StandardCharsets.UTF_8);
+
+    /** Reporte cuyo renderizado falla DESPUÉS de abrir el destino (a mitad de la escritura). */
+    private static Report failingReport() {
+        return new Report("Reporte que falla") {
+            private static final long serialVersionUID = 1L;
+            @Override public List<ReportSection> getSections() {
+                throw new IllegalStateException("fallo inducido a mitad de la escritura");
+            }
+        };
+    }
+
+    private static Path newTempDir() throws Exception {
+        return Files.createTempDirectory("report_save_");
+    }
+
+    private static void deleteTree(Path dir) throws Exception {
+        if (!Files.exists(dir)) return;
+        try (java.util.stream.Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+        }
+    }
+
+    /** Nombres de archivos temporales (.tmp) que quedaron en el directorio. */
+    private static List<String> strayTempFiles(Path dir) throws Exception {
+        List<String> found = new java.util.ArrayList<>();
+        try (java.util.stream.Stream<Path> list = Files.list(dir)) {
+            list.forEach(p -> { if (p.getFileName().toString().endsWith(".tmp")) found.add(p.getFileName().toString()); });
+        }
+        return found;
+    }
+
+    private static void assertIsValidReport(File file, String label) throws Exception {
+        try (ReadableWorkbook wb = new ReadableWorkbook(file)) {
+            Assert.assertTrue(wb.findSheet(ExcelReportGenerator.REPORT_SHEET_NAME).isPresent(),
+                label + ": debe contener la hoja '" + ExcelReportGenerator.REPORT_SHEET_NAME + "'");
+        }
+    }
+
+    public static void testWriteReportToFile_replacesExistingFile() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File target = dir.resolve("reporte.xlsx").toFile();
+            Files.write(target.toPath(), ORIGINAL_BYTES);
+
+            ExcelReportGenerator gen = new ExcelReportGenerator();
+            gen.writeReportToFile(gen.generate(resultWithError()), target);
+
+            assertIsValidReport(target, "El destino existente se reemplaza por un reporte válido");
+            Assert.assertEquals(java.util.Collections.<String>emptyList(), strayTempFiles(dir),
+                "No debe quedar ningún archivo temporal");
+        } finally { deleteTree(dir); }
+    }
+
+    public static void testWriteReportToFile_failedRender_leavesExistingFileIntact() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File target = dir.resolve("reporte.xlsx").toFile();
+            Files.write(target.toPath(), ORIGINAL_BYTES);
+
+            Assert.assertThrows(IllegalStateException.class,
+                () -> new ExcelReportGenerator().writeReportToFile(failingReport(), target),
+                "El fallo de renderizado debe propagarse");
+
+            Assert.assertTrue(java.util.Arrays.equals(ORIGINAL_BYTES, Files.readAllBytes(target.toPath())),
+                "Si la escritura falla, el archivo existente debe quedar intacto (no truncado)");
+        } finally { deleteTree(dir); }
+    }
+
+    public static void testWriteReportToFile_failedRender_leavesNoTempFile() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File target = dir.resolve("reporte.xlsx").toFile();
+            Assert.assertThrows(IllegalStateException.class,
+                () -> new ExcelReportGenerator().writeReportToFile(failingReport(), target),
+                "El fallo de renderizado debe propagarse");
+
+            Assert.assertTrue(!target.exists(), "Si falla, no debe crearse un destino a medias");
+            Assert.assertEquals(java.util.Collections.<String>emptyList(), strayTempFiles(dir),
+                "Un fallo no debe dejar archivos temporales");
+        } finally { deleteTree(dir); }
+    }
+
+    public static void testWriteReportToFile_missingDirectory_throwsIOException() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File target = dir.resolve("no_existe").resolve("reporte.xlsx").toFile();
+            ExcelReportGenerator gen = new ExcelReportGenerator();
+            Report report = gen.generate(resultWithError());
+            Assert.assertThrows(java.io.IOException.class,
+                () -> gen.writeReportToFile(report, target),
+                "Un directorio inexistente debe producir IOException");
+            Assert.assertTrue(!dir.resolve("no_existe").toFile().exists(),
+                "No debe crear el directorio faltante");
+        } finally { deleteTree(dir); }
+    }
+
+    /**
+     * Con el destino abierto por otro proceso (en Windows impide reemplazarlo) el
+     * resultado debe ser siempre limpio: o bien el reporte nuevo y válido, o bien
+     * el original intacto — nunca un archivo a medias — y sin temporales.
+     */
+    public static void testWriteReportToFile_lockedTarget_isAlwaysCleanOutcome() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File target = dir.resolve("reporte.xlsx").toFile();
+            Files.write(target.toPath(), ORIGINAL_BYTES);
+
+            ExcelReportGenerator gen = new ExcelReportGenerator();
+            Report report = gen.generate(resultWithError());
+            boolean replaced;
+            try (java.io.FileInputStream holder = new java.io.FileInputStream(target)) {
+                try {
+                    gen.writeReportToFile(report, target);
+                    replaced = true;
+                } catch (java.io.IOException expectedOnWindows) {
+                    replaced = false;
+                }
+            }
+
+            if (replaced) {
+                assertIsValidReport(target, "Reemplazado");
+            } else {
+                Assert.assertTrue(java.util.Arrays.equals(ORIGINAL_BYTES, Files.readAllBytes(target.toPath())),
+                    "Si no se pudo reemplazar, el original debe quedar intacto");
+            }
+            Assert.assertEquals(java.util.Collections.<String>emptyList(), strayTempFiles(dir),
+                "No debe quedar ningún archivo temporal");
+        } finally { deleteTree(dir); }
+    }
+
+    // ── Plan 005: isSameFile ──────────────────────────────────────────────
+
+    public static void testIsSameFile_sameFileSpelledTwoWays() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File real = dir.resolve("aces.xlsx").toFile();
+            Files.write(real.toPath(), ORIGINAL_BYTES);
+            File alias = new File(dir.toFile(), "." + File.separator + "aces.xlsx");
+            Assert.assertTrue(ExcelReportGenerator.isSameFile(real, alias),
+                "'dir\\.\\aces.xlsx' y 'dir\\aces.xlsx' son el mismo archivo");
+            Assert.assertTrue(ExcelReportGenerator.isSameFile(real, real), "Un archivo es igual a sí mismo");
+        } finally { deleteTree(dir); }
+    }
+
+    public static void testIsSameFile_notYetExistingFile_comparedByPath() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File a = new File(dir.toFile(), "nuevo.xlsx");
+            File b = new File(dir.toFile(), "." + File.separator + "nuevo.xlsx");
+            Assert.assertTrue(!a.exists(), "Precondición: el archivo no existe");
+            Assert.assertTrue(ExcelReportGenerator.isSameFile(a, b),
+                "Sin existir, se compara por ruta normalizada");
+        } finally { deleteTree(dir); }
+    }
+
+    public static void testIsSameFile_differentFilesAndNulls() throws Exception {
+        Path dir = newTempDir();
+        try {
+            File a = dir.resolve("a.xlsx").toFile();
+            File b = dir.resolve("b.xlsx").toFile();
+            Files.write(a.toPath(), ORIGINAL_BYTES);
+            Files.write(b.toPath(), ORIGINAL_BYTES);   // mismo contenido, distinto archivo
+            Assert.assertTrue(!ExcelReportGenerator.isSameFile(a, b), "Archivos distintos");
+            Assert.assertTrue(!ExcelReportGenerator.isSameFile(a, null), "null no es el mismo archivo");
+            Assert.assertTrue(!ExcelReportGenerator.isSameFile(null, a), "null no es el mismo archivo");
+            Assert.assertTrue(!ExcelReportGenerator.isSameFile(null, null), "null/null no es 'el mismo'");
+        } finally { deleteTree(dir); }
     }
 }

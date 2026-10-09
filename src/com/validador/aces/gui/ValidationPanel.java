@@ -52,15 +52,13 @@ import com.validador.aces.validation.AttributeValidator;
  *   <li>Métricas agregadas: aplicaciones auditadas, compliance promedio,
  *       con errores, sin clasificar.</li>
  *   <li>Tabla con el detalle de atributos faltantes (una fila por error),
- *       limitada a {@value #MAX_TABLE_ROWS} filas para no saturar la UI.</li>
+ *       limitada al máximo configurado en el diálogo de Configuración
+ *       ({@link ConfigDialog#getMaxTableRows()}, por defecto 10 000) para no saturar la UI.</li>
  *   <li>Botón de exportación que genera el reporte Excel mediante
  *       {@link ExcelReportGenerator#generateAndWriteBatch}.</li>
  * </ul>
  */
 public class ValidationPanel extends JPanel {
-
-    /** Máximo de filas mostradas en la tabla de errores. */
-    private static final int MAX_TABLE_ROWS = 10_000;
 
     // Estados internos del panel
     private static final String ST_IDLE    = "IDLE";
@@ -118,6 +116,22 @@ public class ValidationPanel extends JPanel {
         setLayout(new BorderLayout());
         add(buildNorthBar(), BorderLayout.NORTH);
         add(stateIdle, BorderLayout.CENTER);
+
+        // Si cambia el catálogo o el ACES, los resultados mostrados dejan de ser válidos
+        window.addResultsInvalidatedListener(this::resetResults);
+    }
+
+    /**
+     * Descarta los resultados de la auditoría anterior y vuelve al estado
+     * inicial (tabla vacía, métricas ocultas, sin nada que exportar). Los
+     * botones de carga están deshabilitados mientras corre una auditoría, así
+     * que esto nunca se ejecuta con una auditoría en curso.
+     */
+    private void resetResults() {
+        lastResults = null;
+        lastByProductLine = null;
+        tableModel.setRowCount(0);
+        switchState(ST_IDLE);
     }
 
     // ── Layout ────────────────────────────────────────────────────────────
@@ -361,6 +375,9 @@ public class ValidationPanel extends JPanel {
         double sumCompliance = 0;
         int applicableCount = 0;
 
+        // Tope de filas de la tabla: se lee una vez por renderizado (no por fila)
+        final int maxRows = ConfigDialog.getMaxTableRows();
+
         List<Object[]> rows = new ArrayList<>();
         for (int i = 0; i < results.size(); i++) {
             ComparisonResult r = results.get(i);
@@ -370,7 +387,7 @@ public class ValidationPanel extends JPanel {
 
             if (isUnclassified) {
                 unclassified++;
-                if (rows.size() < MAX_TABLE_ROWS) {
+                if (rows.size() < maxRows) {
                     rows.add(new Object[]{
                         apps.get(i).getName(),
                         apps.get(i).getProductName() != null ? apps.get(i).getProductName() : "-",
@@ -387,7 +404,7 @@ public class ValidationPanel extends JPanel {
                 withErrors++;
                 for (ValidationError err : r.getErrors()) {
                     if (!AttributeValidator.MISSING_REQUIRED_ATTRIBUTE.equals(err.getCode())) continue;
-                    if (rows.size() < MAX_TABLE_ROWS) {
+                    if (rows.size() < maxRows) {
                         rows.add(new Object[]{
                             apps.get(i).getName(),
                             err.getProductLine() != null ? err.getProductLine() : "-",
@@ -420,9 +437,9 @@ public class ValidationPanel extends JPanel {
             lblTableTitle.setText("  ✔  Ningún atributo faltante — todas las aplicaciones clasificadas cumplen con los atributos requeridos.");
             lblTableTitle.setForeground(MainWindow.SCI_BLUE);
         } else {
-            int shown = Math.min(rows.size(), MAX_TABLE_ROWS);
+            int shown = Math.min(rows.size(), maxRows);
             lblTableTitle.setText("  " + fmt(shown) + " registros" +
-                (rows.size() >= MAX_TABLE_ROWS ? "  (mostrando primeros " + fmt(MAX_TABLE_ROWS) + ")" : ""));
+                (rows.size() >= maxRows ? "  (mostrando primeros " + fmt(maxRows) + ")" : ""));
             lblTableTitle.setForeground(MainWindow.MID_GRAY);
         }
     }
@@ -454,6 +471,26 @@ public class ValidationPanel extends JPanel {
         if (!outputFile.getName().toLowerCase().endsWith(".xlsx"))
             outputFile = new File(outputFile.getAbsolutePath() + ".xlsx");
 
+        // Nunca escribir el reporte encima del ACES de entrada
+        if (ExcelReportGenerator.isSameFile(outputFile, acesFile)) {
+            JOptionPane.showMessageDialog(window,
+                "No se puede sobrescribir el archivo ACES original:\n" + acesFile.getAbsolutePath()
+                    + "\n\nElija otro nombre para el reporte.",
+                "Archivo no permitido", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Pedir confirmación antes de reemplazar un archivo existente (por defecto: Cancelar)
+        if (outputFile.exists()) {
+            Object[] options = {"Reemplazar", "Cancelar"};
+            int choice = JOptionPane.showOptionDialog(window,
+                "El archivo ya existe:\n" + outputFile.getAbsolutePath()
+                    + "\n\n¿Desea reemplazarlo?",
+                "Confirmar reemplazo", JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE,
+                null, options, options[1]);
+            if (choice != 0) return;
+        }
+
         final File finalOut = outputFile;
         window.setStatus("Generando reporte Excel…");
         window.setButtonsEnabled(false);
@@ -475,7 +512,7 @@ public class ValidationPanel extends JPanel {
                 } catch (ExecutionException ex) {
                     Throwable cause = ex.getCause();
                     JOptionPane.showMessageDialog(window,
-                        "Error al exportar:\n\n" + (cause != null ? cause.getMessage() : ex.getMessage()),
+                        "Error al exportar:\n\n" + describeExportError(cause != null ? cause : ex, finalOut),
                         "Error de exportación", JOptionPane.ERROR_MESSAGE);
                     window.setStatus("✘  Error al exportar el reporte.", MainWindow.C_ERROR);
                 } catch (Exception ex) {
@@ -485,6 +522,21 @@ public class ValidationPanel extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    /**
+     * Texto para el usuario cuando falla la exportación. Un acceso denegado al
+     * reemplazar el destino suele significar que el reporte está abierto en otro
+     * programa (p. ej. Excel); el mensaje original solo traería la ruta.
+     */
+    private static String describeExportError(Throwable cause, File out) {
+        if (cause instanceof java.nio.file.AccessDeniedException) {
+            return "No se pudo reemplazar el archivo. Puede estar abierto en otro programa "
+                + "(por ejemplo Excel) o no tener permiso de escritura:\n" + out.getAbsolutePath()
+                + "\n\nCierre el archivo e inténtelo de nuevo. El archivo existente no se modificó.";
+        }
+        String message = cause.getMessage();
+        return message != null ? message : cause.getClass().getSimpleName();
     }
 
     // ── Cambio de estado ──────────────────────────────────────────────────

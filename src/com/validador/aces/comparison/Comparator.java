@@ -13,7 +13,6 @@ import com.validador.aces.models.ComparisonResult;
 import com.validador.aces.models.ProductLine;
 import com.validador.aces.models.ValidationError;
 import com.validador.aces.validation.AttributeValidator;
-import com.validador.aces.validation.CompositeValidator;
 import com.validador.aces.validation.ValidationSchema;
 
 /**
@@ -43,14 +42,24 @@ import com.validador.aces.validation.ValidationSchema;
  *       resolver la línea de producto de todas las aplicaciones del lote
  *       sin volver a recorrer la lista completa en cada iteración. No se
  *       modifica {@code Catalog} para lograr esto: el índice es un detalle
- *       interno y transitorio de esta clase.</li>
+ *       interno y transitorio de esta clase. La línea y su esquema se
+ *       resuelven <b>una sola vez</b> por aplicación y se pasan ya resueltos
+ *       a {@link AttributeValidator#validateResolved}, de modo que el validador
+ *       no vuelve a buscar en el catálogo ni reconstruye el esquema.</li>
  * </ul>
+ *
+ * <p>Si el catálogo tiene varias líneas con el mismo nombre (sin distinguir
+ * mayúsculas ni espacios en los extremos), <b>gana la primera</b>, tanto en
+ * {@code compare} como en {@code compareAll}.</p>
  *
  * <p>Cada invocación de {@code compare} o {@code compareAll} registra un
  * {@link AuditReport} accesible mediante {@link #getLastAuditReport()},
  * reemplazando el reporte de la invocación anterior.</p>
  */
 public class Comparator {
+
+    /** Sin estado: se comparte para no crear uno por aplicación. */
+    private static final AttributeValidator ATTRIBUTE_VALIDATOR = new AttributeValidator();
 
     private final String user;
     private boolean stopOnFirstCriticalError = false;
@@ -79,9 +88,13 @@ public class Comparator {
     }
 
     /**
-     * Configura si la cadena de validadores interna debe abortar en cuanto
-     * se produzca el primer error crítico. Ver
+     * Configura si la cadena de validadores debe abortar en cuanto se produzca
+     * el primer error crítico. Ver
      * {@code CompositeValidator.setStopOnFirstCriticalError(boolean)}.
+     *
+     * <p>Hoy solo se ejecuta {@link AttributeValidator}, un único validador, por
+     * lo que esta opción no tiene efecto observable; se conserva por
+     * compatibilidad de la API y para cuando se conecten más validadores.</p>
      *
      * @param value true para abortar ante el primer error crítico
      */
@@ -123,7 +136,8 @@ public class Comparator {
         long start = System.currentTimeMillis();
 
         ProductLine line = catalog.findProductByName(application.getProductName());
-        ComparisonResult result = compareInternal(application, catalog, line);
+        ValidationSchema schema = line != null ? new ValidationSchema(line) : null;
+        ComparisonResult result = buildResult(application, catalog, line, schema);
 
         long duration = System.currentTimeMillis() - start;
         recordSingleAudit(application, result, duration);
@@ -166,7 +180,7 @@ public class Comparator {
             String key = normalizeKey(application.getProductName());
             ProductLine line = key == null ? null : productIndex.get(key);
             ValidationSchema schema = key == null ? null : schemaCache.get(key);
-            results.add(compareInternalOptimized(application, catalog, line, schema));
+            results.add(buildResult(application, catalog, line, schema));
         }
 
         long duration = System.currentTimeMillis() - start;
@@ -187,7 +201,8 @@ public class Comparator {
         for (ProductLine line : catalog.getProductLines()) {
             String key = normalizeKey(line.getName());
             if (key != null) {
-                index.put(key, line);
+                // Nombres duplicados: gana la primera línea (igual que Catalog.findProductByName)
+                index.putIfAbsent(key, line);
             }
         }
         return index;
@@ -210,28 +225,28 @@ public class Comparator {
     }
 
     /**
-     * Versión optimizada de compareInternal que usa un esquema precalculado,
-     * evitando la creación repetida de ValidationSchema para cada aplicación.
+     * Lógica común de {@code compare} y {@code compareAll}, una vez resuelta
+     * (o no) la {@link ProductLine} de la aplicación. Valida con
+     * {@link AttributeValidator#validateResolved} y calcula los contadores con
+     * el <b>mismo</b> esquema, de modo que {@code 0 <= inválidos <= total}
+     * siempre se cumple (los faltantes son un subconjunto de los requeridos
+     * del esquema).
      *
      * @param application aplicación a comparar
-     * @param catalog     catálogo maestro
-     * @param line        línea de producto ya resuelta, o null
-     * @param schema      esquema de validación precalculado, o null
+     * @param catalog     catálogo maestro (solo aporta el nombre al resultado)
+     * @param line        línea de producto ya resuelta, o null si no se encontró
+     * @param schema      esquema de {@code line}, o null si {@code line} es null
      * @return resultado de la comparación
      */
-    private ComparisonResult compareInternalOptimized(Application application, Catalog catalog, 
-                                                      ProductLine line, ValidationSchema schema) {
-        CompositeValidator compositeValidator = new CompositeValidator();
-        compositeValidator.addValidator(new AttributeValidator());
-        compositeValidator.setStopOnFirstCriticalError(stopOnFirstCriticalError);
-
-        List<ValidationError> allErrors = compositeValidator.validate(application, catalog);
+    private ComparisonResult buildResult(Application application, Catalog catalog,
+                                         ProductLine line, ValidationSchema schema) {
+        List<ValidationError> allErrors = ATTRIBUTE_VALIDATOR.validateResolved(application, line, schema);
 
         ComparisonResult result = new ComparisonResult(application.getName(), catalog.getName());
         result.addErrors(allErrors);
         result.setPartNumber(application.getPartNumber());
 
-        if (line != null && schema != null) {
+        if (line != null) {
             int total = schema.getRequiredAttributes().size();
             int missingCount = countErrorsByCode(allErrors, AttributeValidator.MISSING_REQUIRED_ATTRIBUTE);
             result.setTotalAttributes(total);
@@ -253,48 +268,6 @@ public class Comparator {
             return null;
         }
         return value.trim().toLowerCase();
-    }
-
-    /**
-     * Lógica común de comparación, una vez resuelta (o no) la
-     * {@link ProductLine} de la aplicación. Ejecuta la cadena de
-     * validadores ({@link AttributeValidator} dentro de un
-     * {@link CompositeValidator}) y calcula los contadores de atributos a
-     * partir del {@link ValidationSchema} de la línea de producto (si fue
-     * encontrada).
-     *
-     * @param application aplicación a comparar
-     * @param catalog     catálogo maestro (requerido por el contrato de {@code Validator})
-     * @param line        línea de producto ya resuelta, o null si no se encontró
-     * @return resultado de la comparación
-     */
-    private ComparisonResult compareInternal(Application application, Catalog catalog, ProductLine line) {
-        CompositeValidator compositeValidator = new CompositeValidator();
-        compositeValidator.addValidator(new AttributeValidator());
-        compositeValidator.setStopOnFirstCriticalError(stopOnFirstCriticalError);
-
-        List<ValidationError> allErrors = compositeValidator.validate(application, catalog);
-
-        ComparisonResult result = new ComparisonResult(application.getName(), catalog.getName());
-        result.addErrors(allErrors);
-        result.setPartNumber(application.getPartNumber());
-
-        if (line != null) {
-            ValidationSchema schema = new ValidationSchema(line);
-            int total = schema.getRequiredAttributes().size();
-            int missingCount = countErrorsByCode(allErrors, AttributeValidator.MISSING_REQUIRED_ATTRIBUTE);
-            result.setTotalAttributes(total);
-            result.setInvalidAttributes(missingCount);
-            result.setValidAttributes(total - missingCount);
-            result.setOptionalAttributeNames(schema.getOptionalAttributeNames());
-            result.setMissingOptionalAttributes(schema.findMissingOptionalAttributes(application));
-        } else {
-            result.setTotalAttributes(0);
-            result.setValidAttributes(0);
-            result.setInvalidAttributes(0);
-        }
-
-        return result;
     }
 
     private int countErrorsByCode(List<ValidationError> errors, String code) {

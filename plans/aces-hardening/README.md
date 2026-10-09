@@ -33,11 +33,11 @@ is available (`C:\opt\ant\bin\ant.bat`).
 | [001](001-reliable-test-gate.md) | Make the test suite a reliable gate | S–M | — | DONE |
 | [002](002-clone-buildable-and-claude-md.md) | Fresh clone builds; `CLAUDE.md` with verified commands | S | 001 | DONE |
 | [003](003-parser-correctness.md) | Parsers read catalog/ACES faithfully | M | 001 | DONE |
-| [004](004-comparator-single-path.md) | Resolve product line once; fix duplicate-name divergence | M | 001 (run after 003) | TODO |
-| [005](005-safe-report-export.md) | Safe export: confirm overwrite, protect ACES, atomic write | S–M | 001 | TODO |
-| [006](006-invalidate-stale-results.md) | Invalidate results when inputs change | S–M | 005 | TODO |
-| [007](007-remove-dead-code.md) | Remove uncalled production code | S | 001, 004 | TODO |
-| [008](008-single-config-source.md) | One config source; `maxTableRows` works | S | 006 | TODO |
+| [004](004-comparator-single-path.md) | Resolve product line once; fix duplicate-name divergence | M | 001 (run after 003) | DONE |
+| [005](005-safe-report-export.md) | Safe export: confirm overwrite, protect ACES, atomic write | S–M | 001 | DONE |
+| [006](006-invalidate-stale-results.md) | Invalidate results when inputs change | S–M | 005 | DONE |
+| [007](007-remove-dead-code.md) | Remove uncalled production code | S | 001, 004 | DONE |
+| [008](008-single-config-source.md) | One config source; `maxTableRows` works | S | 006 | DONE |
 | [009](009-docs-consolidation.md) | Docs match the project; archive history | M | 002, 007, 008 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) |
@@ -63,6 +63,45 @@ SUPERSEDED (one-line pointer to what replaced it)
 
 (Newest first. A few lines per entry, hard cap.)
 
+- **2026-10-09**: Plans 007 + 008 closed (working tree, not committed). 007:
+  six files + `utils/` deleted (all tracked and unmodified → recoverable with
+  `git checkout -- <path>`), clean compile, suite unchanged at 120. 008:
+  `ConfigDialog.getMaxTableRows()` now drives `ValidationPanel` (read once per
+  render); `src/application.properties` deleted (no reader). Verified with a
+  throwaway program using `-Duser.home` temp dirs (never touched the real user
+  config): default → 3000/3000 rows; `maxTableRows=1000` → 1000 rows + label
+  "(mostrando primeros 1.000)"; HEAD ignores the setting (negative control).
+  Docs still mentioning removed items (input for 009): GENERATED_ARTIFACTS,
+  IMPLEMENTATION_GUIDE, INDEX, LOGICA_DEL_PROGRAMA, PROGRESS, PROJECT_STRUCTURE,
+  QUICK_START, README, REFERENCE, SETUP_COMPLETE, START_HERE, tasks.md,
+  `.kiro/specs/.../design.md`. Next: 009.
+- **2026-10-09**: Plan 006 closed (working tree, not committed). Deviation:
+  small edit in `StatisticsPanel.refresh()` (out of the listed scope) — clears
+  the stale detail text/summaries in the empty state. Instead of only a manual
+  smoke, the real `MainWindow`+`ValidationPanel`+`StatisticsPanel` were driven
+  headlessly by a throwaway program outside the repo (21 checks: invalidation on
+  new ACES/catalog/failed load, same-instance reassign keeps results, stats
+  empty state): all pass; same program against HEAD fails 10 checks (negative
+  control). Not clicked by the executor: file dialogs, real load buttons.
+  Suite unchanged at 120 (no Swing unit tests exist); `ant test` OK. Next: 007.
+- **2026-10-09**: Plan 005 closed (working tree, not committed). 8 new tests
+  (plan asked ≥4); the truncation defect was reproduced before the fix (failed
+  render left the existing file truncated), suite 112 → 120, `ant test` OK.
+  Deviation: added `describeExportError` in `ValidationPanel` (open-in-Excel →
+  `AccessDeniedException` previously showed only the path; observed on Windows:
+  original intact, no temp left). GUI guards (a)(b)(c) NOT operated by the
+  executor; app starts. `AuditPanel` CSV export untouched (deferred). Next: 006.
+- **2026-10-09**: Plan 004 closed (working tree, not committed). 10 new tests
+  (8 equivalence passed before AND after; 2 duplicate-name tests failed before,
+  pass now); suite 102 → 112, `ant test` OK. Real data (38 265 lines × 81 886
+  apps): results identical to HEAD (same checksum) and `compareAll` 10.6 s →
+  0.18 s; synthetic 20k×40k: 6.7 s → 0.21 s, identical checksum. Real catalog
+  has 0 duplicate names, so first-wins changes nothing on it. Real ACES is 100 %
+  compliant (0 missing), so missing-attribute behavior is covered only by
+  synthetic tests. Heads-up: `ParserRegressionTest.java` and
+  `ComparatorEquivalenceTest.java` are untracked while the committed
+  `TestRunner` references them → commit them or HEAD's `tests/` won't compile.
+  Next: 005.
 - **2026-10-09**: Plan 003 closed (working tree, not committed). 7 regression
   tests (plan asked ≥4), seen failing before the fix (shift reproduced: `C` read
   REQUIRED instead of OPTIONAL); suite 95 → 102, all pass. Real catalog

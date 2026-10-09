@@ -39,9 +39,36 @@ public class AttributeValidator extends Validator {
             throw new IllegalArgumentException("Catalog no puede ser null");
         }
 
+        ProductLine line = catalog.findProductByName(application.getProductName());
+        ValidationSchema schema = line != null ? new ValidationSchema(line) : null;
+        return validateResolved(application, line, schema);
+    }
+
+    /**
+     * Igual que {@link #validate(Application, Catalog)} pero con la línea de
+     * producto y su esquema ya resueltos por el llamador. Sirve para validar
+     * lotes grandes sin volver a buscar la línea en el catálogo (búsqueda lineal)
+     * ni reconstruir el {@link ValidationSchema} por cada aplicación, y garantiza
+     * que los errores y los totales del llamador salgan de la misma línea.
+     *
+     * @param application aplicación a validar
+     * @param line        línea de producto de la aplicación, o null si no se encontró
+     * @param schema      esquema de {@code line}; debe ser null si y solo si {@code line} es null
+     * @return errores/advertencias de la aplicación (mismo contenido que {@code validate})
+     * @throws IllegalArgumentException si {@code application} es null, o si solo uno de
+     *                                  {@code line}/{@code schema} es null
+     */
+    public List<ValidationError> validateResolved(Application application, ProductLine line,
+                                                  ValidationSchema schema) {
+        if (application == null) {
+            throw new IllegalArgumentException("Application no puede ser null");
+        }
+        if ((line == null) != (schema == null)) {
+            throw new IllegalArgumentException("line y schema deben ser ambos null o ambos no null");
+        }
+
         List<ValidationError> errors = new ArrayList<>();
 
-        ProductLine line = catalog.findProductByName(application.getProductName());
         if (line == null) {
             errors.add(new ValidationError(
                 ErrorSeverity.WARNING,
@@ -54,7 +81,6 @@ public class AttributeValidator extends Validator {
             return errors;
         }
 
-        ValidationSchema schema = new ValidationSchema(line);
         List<String> missing = schema.findMissingRequiredAttributes(application);
 
         for (String attributeName : missing) {
