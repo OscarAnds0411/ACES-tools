@@ -1,258 +1,82 @@
 # Validador de Atributos ACES
 
-Herramienta Java para validar atributos de productos contra catálogos maestros ACES, con interfaz gráfica y generación de reportes en Excel.
+Aplicación de escritorio (Java 11, Swing) que **audita archivos ACES de autopartes** contra un **catálogo maestro** de atributos y genera un reporte Excel de cumplimiento (compliance).
 
-## Descripción General
-
-El Validador de Atributos ACES es una aplicación completa que permite:
-
-1. **Cargar catálogos maestros** de atributos desde archivos Excel
-2. **Cargar datos de aplicaciones** a ser validadas
-3. **Ejecutar validaciones** contra múltiples reglas y criterios
-4. **Generar reportes detallados** en formato Excel con estadísticas
-5. **Auditar todas las operaciones** de validación y comparación
-6. **Analizar compliance** y conformidad de datos
-
-## Estructura de Directorios
-
-```
-validadorDeAtributosAces/
-├── src/                          # Código fuente Java
-│   ├── com/validador/aces/
-│   │   ├── models/              # Modelos de datos
-│   │   ├── parsers/             # Parsers Excel/XML
-│   │   ├── validation/          # Validadores
-│   │   ├── comparison/          # Comparación y análisis
-│   │   ├── reporting/           # Generadores de reporte
-│   │   ├── gui/                 # Interfaz gráfica
-│   │   └── Launcher.java        # Punto de entrada
-│   └── application.properties   # Configuración
-├── lib/                         # Librerías externas (JAR)
-├── bin/                         # Archivos compilados (generado)
-├── dist/                        # JAR ejecutable (generado)
-├── ACES/                        # Archivos de ejemplo
-├── catalogoDb/                  # Base de datos de catálogos
-├── tasks.md                     # Plan de implementación
-├── build.xml                    # Script de compilación Ant
-├── IMPLEMENTATION_GUIDE.md      # Guía técnica de implementación
-└── README.md                    # Este archivo
-```
+Para cada aplicación del archivo ACES se busca su línea de producto en el catálogo; los atributos marcados `Required` deben tener valor. El compliance es `requeridos satisfechos / requeridos totales`. El detalle de la lógica está en [`LOGICA_DEL_PROGRAMA.md`](LOGICA_DEL_PROGRAMA.md).
 
 ## Requisitos
 
-- **Java 11 o superior**
-- **Apache Ant** (para compilación con build.xml)
-- Archivo de catálogo ACES en formato .xlsx
-- Archivo de aplicación a validar en formato .xlsx
+- **JDK 11 o superior** (se compila con `--release 11`; probado con JDK 25).
+- **Apache Ant** (opcional; sirve para empaquetar y para `ant test`).
+- Dos archivos `.xlsx`: el catálogo y el ACES a validar. No se versionan (`*.xlsx` está en `.gitignore`).
 
-## Compilación
+Las librerías están en `lib/` (ver [`lib/README.md`](lib/README.md)); un clon no necesita descargar nada.
 
-### Opción 1: Con Apache Ant (Recomendado)
+## Compilar, probar y ejecutar
 
-```bash
-# Ver información
-ant info
+Desde la raíz del repositorio. Los comandos completos y verificados están en [`CLAUDE.md`](CLAUDE.md).
 
-# Compilar
-ant compile
+**PowerShell** (no usar Git Bash: parte el `;` del classpath):
 
-# Empaquetar JAR
-ant jar
+```powershell
+$out="$env:TEMP\aces-out"; New-Item -ItemType Directory -Force $out | Out-Null
+javac --release 11 -encoding UTF-8 -cp "lib/*" -d $out (Get-ChildItem -Recurse src -Filter *.java).FullName
 
-# Ejecutar
-ant run
-
-# Todo (clean, compile, jar, javadoc)
-ant all
+java "-Dfile.encoding=UTF-8" -cp "lib\*;$out" com.validador.aces.tests.TestRunner   # pruebas
+java -cp "lib\*;$out" com.validador.aces.Launcher                                   # abrir la aplicación
 ```
 
-### Opción 2: Con Java directamente
+**Ant** (`ant` en el PATH, o `ANT_HOME`; `build.bat <target>` también lo encuentra):
 
-```bash
-# Compilar
-javac -cp lib/*:. -d bin src/com/validador/aces/**/*.java
+| Objetivo | Comando |
+|---|---|
+| Compilar a `bin/` | `ant compile` |
+| Pruebas (falla el build si alguna falla) | `ant test` |
+| JAR ejecutable en `dist/` | `ant jar` y luego `java -jar dist/validador-aces.jar` |
+| Compilar, empaquetar y ejecutar | `ant run` |
+| Limpiar `bin/`, `dist/` y `docs/` | `ant clean` |
 
-# Ejecutar
-java -cp bin:lib/* com.validador.aces.Launcher
-
-# Empaquetar
-jar cfm dist/validador-aces.jar manifest.txt -C bin .
-```
-
-### Opción 3: Con Visual Studio Code
-
-1. Asegúrate que tienes las extensiones Java instaladas
-2. Abre la carpeta del proyecto
-3. Usa la vista de "Java Projects" para compilar
-4. Ejecuta `App.java` desde el editor
-
-## Ejecución
-
-### Interfaz Gráfica (Recomendado)
-
-```bash
-# Desde JAR empaquetado
-java -jar dist/validador-aces.jar
-
-# Desde clases compiladas
-java -cp bin:lib/* com.validador.aces.Launcher
-```
-
-### Línea de Comandos (Futuro)
-
-```bash
-java -jar validador-aces.jar \
-  --catalog catalogo.xlsx \
-  --app aplicacion.xlsx \
-  --output reporte.xlsx \
-  --strictness NORMAL
-```
+Las pruebas que usan los archivos reales (`catalogoDb/`, `ACES/`) se omiten si no existen; ver [`src/com/validador/aces/tests/README.md`](src/com/validador/aces/tests/README.md).
 
 ## Uso
 
-### Flujo de Trabajo Básico
+1. **Cargar catálogo**: botón *Cargar catálogo*, elegir el `.xlsx` y la hoja (por defecto `Product Line ACES Attributes`). **Debe cargarse antes que el ACES.**
+2. **Cargar ACES**: botón *Cargar ACES*, elegir el `.xlsx` y la hoja (se autodetecta la que tenga `Make`, `Model`, `Year` y `Product`). La pantalla informa cuántas filas se omitieron por no tener `Make`.
+3. **Ejecutar auditoría**: se habilita cuando ambos archivos están cargados. Muestra métricas y la tabla de atributos faltantes; *Estadísticas* resume por línea de producto y *Historial* lista las auditorías de la sesión.
+4. **Exportar reporte**: genera un `.xlsx` con resumen, faltantes, estadísticas por línea y faltantes por número de parte. No permite sobrescribir el ACES original y pide confirmación si el archivo ya existe.
 
-1. **Cargar Catálogo**
-   - Haz clic en "File → Open Catalog"
-   - Selecciona archivo Excel con catálogo ACES
-   - Espera a que se cargue
-
-2. **Cargar Aplicación**
-   - Haz clic en "File → Open Application"
-   - Selecciona archivo Excel con datos de aplicación
-   - Espera a que se cargue
-
-3. **Ejecutar Validación**
-   - Haz clic en botón "Validate"
-   - Observa progreso de validación
-   - Revisa resultados en tabla
-
-4. **Análisis de Resultados**
-   - Observa compliance percentage
-   - Filtra por severity (Error, Warning, Info)
-   - Filtra por ProductLine
-   - Revisa estadísticas por tipo
-
-5. **Exportar Reporte**
-   - Haz clic en botón "Export Report"
-   - Selecciona ubicación y nombre
-   - Reporte Excel se genera con múltiples hojas
-
-## Plan de Implementación
-
-Ver archivo `tasks.md` para lista completa de 54 tareas organizadas por componente:
-
-- **TASK-001 a TASK-007**: Modelos de Datos
-- **TASK-008 a TASK-012**: Parsers
-- **TASK-013 a TASK-018**: Validadores
-- **TASK-019 a TASK-021**: Comparación
-- **TASK-022 a TASK-026**: Reportes
-- **TASK-027 a TASK-034**: GUI
-- **TASK-035 a TASK-047**: Testing
-- **TASK-051 a TASK-054**: Empaquetado
-
-Cada tarea incluye: Descripción, Criterios de Aceptación, Dependencias, Complejidad y Prioridad.
-
-## Guía Técnica
-
-Ver archivo `IMPLEMENTATION_GUIDE.md` para:
-
-- Estructura de directorios recomendada
-- Dependencias externas
-- Patrones de diseño a usar
-- Enumeraciones y interfaces clave
-- Configuración
-- Manejo de excepciones
-- Logging y testing
-- Checklist de implementación
-
-## Características Principales
-
-### v1.0 (MVP)
-- ✅ Carga de catálogos Excel
-- ✅ Carga de aplicaciones Excel
-- ✅ Validadores básicos (atributo, rango, enum, fecha)
-- ✅ Interfaz gráfica simple
-- ✅ Reporte Excel con estadísticas
-- ✅ Auditoría básica
-
-### v1.1 (Planeado)
-- 🔲 Property-based testing
-- 🔲 Caché de resultados
-- 🔲 Más validadores especializados
-- 🔲 Estadísticas avanzadas con gráficos
-
-### v2.0 (Futuro)
-- 🔲 API REST
-- 🔲 Base de datos para historial
-- 🔲 Exportación a PDF
-- 🔲 Validación distribuida/paralela
+Si cambias el catálogo o el ACES, los resultados anteriores se descartan.
 
 ## Configuración
 
-El archivo `src/application.properties` contiene:
+Solo hay una: el diálogo de Configuración (botón ⚙ de la ventana), que guarda `~/.validador_aces_config.properties` con el máximo de filas de la tabla de resultados (por defecto 10 000) y el directorio de exportación por defecto.
 
-- Parámetros de validación (strictness, max-errors, etc)
-- Configuración de caché
-- Opciones de reporte
-- Personalización de GUI
-- Configuración de auditoría
-- Opciones de logging
+## Estructura
 
-Edita este archivo para cambiar el comportamiento de la aplicación.
-
-## Librerías Incluidas
-
-- **fastexcel** - Lectura/escritura eficiente de Excel
-- **commons-io, commons-lang3** - Utilidades Java
-- **aalto-xml, stax2** - Procesamiento XML
-- **commons-compress** - Compresión de archivos
-
-## Troubleshooting
-
-### "No class found" al compilar
-```bash
-ant clean compile
+```
+src/com/validador/aces/
+├── models/        datos: Catalog, ProductLine, Attribute, Application, ComparisonResult…
+├── parsers/       lectura de los .xlsx
+├── validation/    reglas (AttributeValidator, ValidationSchema…)
+├── comparison/    Comparator y métricas de compliance
+├── reporting/     reporte Excel
+├── gui/           interfaz Swing
+├── tests/         pruebas con ejecutor propio (sin JUnit)
+└── Launcher.java  punto de entrada
+lib/               librerías (JAR)         build.xml / build.bat   compilación con Ant
+plans/             planes de trabajo       archive/                documentos históricos
 ```
 
-### "Cannot find symbol" para clases del proyecto
-- Asegúrate de seguir el orden de tareas (respetar dependencias)
-- Verifica que el paquete `com.validador.aces` está en `src/`
-
-### Interfaz gráfica no aparece
-```bash
-java -cp bin:lib/* com.validador.aces.Launcher
-```
-
-### Archivo Excel no se carga
-- Verifica que es formato .xlsx (no .xls)
-- Verifica que el archivo no está corrupto
-- Revisa logs en `validador-aces.log`
+Cada paquete tiene su propio `README.md`.
 
 ## Documentación
 
-- `tasks.md` - Plan de implementación detallado
-- `IMPLEMENTATION_GUIDE.md` - Guía técnica
-- JavaDoc - Ver en `docs/` después de compilar con `ant javadoc`
-
-## Contribución
-
-1. Selecciona una tarea de `tasks.md`
-2. Respeta dependencias con otras tareas
-3. Sigue estructura de paquetes recomendada
-4. Incluye unit tests para nueva funcionalidad
-5. Mantén comentarios y documentación actualizados
+- [`LOGICA_DEL_PROGRAMA.md`](LOGICA_DEL_PROGRAMA.md): cómo funciona el programa, paso a paso.
+- [`CLAUDE.md`](CLAUDE.md): comandos verificados y convenciones.
+- [`tasks.md`](tasks.md): plan de implementación original (con una sección de estado real al inicio).
+- [`plans/aces-hardening/`](plans/aces-hardening/README.md): plan de mejoras derivado de una auditoría del código.
+- [`archive/`](archive/README.md): notas históricas de planificación y puesta en marcha (pueden estar desactualizadas), incluido el análisis de los archivos de entrada.
 
 ## Licencia
 
-Interno - ACES Team
-
-## Contacto
-
-Para preguntas sobre implementación, ver `IMPLEMENTATION_GUIDE.md` o revisar comentarios en el código.
-
----
-
-**Versión**: 1.0.0  
-**Estado**: En desarrollo  
-**Última actualización**: 2024
+Interno - ACES Team.

@@ -36,7 +36,7 @@ java -cp "lib\*;$out" com.validador.aces.Launcher
 | Compilar, empaquetar y ejecutar | `ant run` |
 | Limpiar `bin/`, `dist/` y `docs/` | `ant clean` |
 
-Línea base: **95 tests, todos pasan**. La consola de Windows puede mostrar `?` en lugar
+Línea base: **120 tests, todos pasan** (menos los omitidos si faltan los archivos reales). La consola de Windows puede mostrar `?` en lugar
 de acentos y símbolos; es solo la página de códigos, no un fallo.
 
 ## Tests
@@ -56,3 +56,4 @@ Flujo: parsers → `Comparator` → `ComplianceCalculator`/`ProductLineSummary` 
 - Los `.xlsx` de entrada y datos de prueba no se versionan (`*.xlsx` está en `.gitignore`).
 - No editar ni versionar `bin/` ni `dist/` (generados). `docs/` está ignorado y `ant clean` lo borra: no guardar documentación allí.
 - Los planes de trabajo viven en `plans/` (ver `plans/aces-hardening/README.md`).
+- Documentación vigente: `README.md` (uso), `LOGICA_DEL_PROGRAMA.md` (lógica) y el `README.md` de cada paquete. Las notas históricas están en `archive/` y pueden estar desactualizadas.

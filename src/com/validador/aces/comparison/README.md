@@ -1,72 +1,24 @@
 # Paquete: comparison
 
-## Descripción
+Compara las aplicaciones contra el catálogo y calcula las métricas de cumplimiento (compliance).
 
-Contiene la lógica para comparar catálogos y detectar diferencias.
+| Clase | Rol |
+|---|---|
+| `Comparator` | `compare(app, catalog)` (una aplicación) y `compareAll(apps, catalog)` (lote) → `ComparisonResult` |
+| `ComplianceCalculator` | Métricas por resultado y agrupadas por línea de producto; resúmenes y faltantes |
+| `ComplianceMetrics` | Requeridos totales / satisfechos / faltantes y porcentaje (N/A si no hay requeridos) |
+| `ProductLineSummary` | Resumen por línea: aplicaciones, requeridos, opcionales y números de parte con faltantes |
 
-## Clases
+## `Comparator`
 
-### TASK-019: CatalogComparator
-- **Descripción**: Comparador base para catálogos
-- **Métodos**: compare(), findDifferences(), generateDiff()
-- **Retorna**: ComparisonResult con diferencias identificadas
-- **Estado**: [TODO]
+- `compareAll` construye **una vez** un índice `nombre normalizado → ProductLine` y un caché de `ValidationSchema`; cada aplicación resuelve su línea y esquema una sola vez y se valida con `AttributeValidator.validateResolved`.
+- Nombres de línea duplicados (sin distinguir mayúsculas ni espacios en los extremos): **gana la primera**, igual en `compare` y `compareAll`.
+- Total e inválidos salen del mismo esquema, así que `0 ≤ inválidos ≤ total`.
+- Registra un `AuditReport` por invocación (`getLastAuditReport()`).
+- `setStopOnFirstCriticalError` se conserva por compatibilidad; con un único validador no tiene efecto.
 
-### TASK-020: AttributeDifferenceDetector
-- **Descripción**: Detecta diferencias en atributos
-- **Métodos**: detectAdded(), detectRemoved(), detectModified()
-- **Tipos de diferencia**: Nuevo, eliminado, modificado, reordenado
-- **Estado**: [TODO]
+## Compliance
 
-### TASK-021: ChangeAnalyzer
-- **Descripción**: Analiza y categoriza cambios
-- **Métodos**: analyzeChange(), calculateImpact(), suggestMigration()
-- **Categorías**: Breaking change, non-breaking change, deprecated
-- **Estado**: [TODO]
+`satisfechos / requeridos × 100`. Si una línea no tiene atributos requeridos el resultado es **N/A**, no 0 %. `calculateByProductLine` pondera por atributos, no promedia porcentajes.
 
-## Dependencias
-
-- Depende de: models (Catalog, ComparisonResult, etc.)
-- Depende de: validation (para validar cambios)
-
-## Archivos Esperados
-
-```
-comparison/
-├── CatalogComparator.java
-├── AttributeDifferenceDetector.java
-├── ChangeAnalyzer.java
-└── README.md
-```
-
-## Tipos de Cambios
-
-### Breaking Changes
-- Eliminación de atributos requeridos
-- Cambio de tipo de dato (reducción)
-- Cambio en validaciones (más restrictivo)
-
-### Non-Breaking Changes
-- Adición de atributos opcionales
-- Cambio de tipo (ampliación)
-- Cambio en validaciones (menos restrictivo)
-
-### Deprecated
-- Marcado para eliminación futura
-- Reemplazo sugerido
-
-## Diferencias Detectables
-
-- Atributos nuevos/eliminados
-- Cambios en propiedades (nombre, tipo, descripción)
-- Cambios en validaciones
-- Cambios en valores permitidos
-- Reorden de atributos
-- Cambios en líneas de producto
-
-## Notas
-
-- Generar reportes detallados de cambios
-- Sugerir migraciones cuando sea posible
-- Identificar impacto potencial en aplicaciones existentes
-- Mantener historial de comparaciones
+Ver `LOGICA_DEL_PROGRAMA.md` §4.3–4.4.

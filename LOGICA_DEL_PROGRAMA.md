@@ -15,7 +15,7 @@ Salida: resultados en pantalla (métricas, estadísticas, historial de auditorí
 
 **Idea central:** para cada aplicación se busca su línea de producto en el catálogo; los atributos `Required` de esa línea deben tener valor no vacío en la aplicación. El porcentaje de *compliance* es `requeridos satisfechos / requeridos totales`.
 
-Tecnología: Java 11+, Swing (GUI), `fastexcel` / `fastexcel-reader` para leer y escribir Excel (JARs en `lib/`), build con Ant (`build.xml`, `build.bat`). Configuración en `src/application.properties`.
+Tecnología: Java 11+, Swing (GUI), `fastexcel` / `fastexcel-reader` para leer y escribir Excel (JARs en `lib/`), build con Ant (`build.xml`, `build.bat`). Configuración: el diálogo de Configuración de la GUI (`~/.validador_aces_config.properties`).
 
 ---
 
@@ -33,7 +33,7 @@ Launcher ──► gui ──► parsers ──► models
 | `models` | Datos puros: `Catalog`, `ProductLine`, `Attribute`, `AttributeRequirement`, `Application`, `ValidationError`, `ComparisonResult`, `AuditReport`, enums. |
 | `parsers` | Leen los Excel y construyen los modelos (`ExcelCatalogParser`, `ExcelApplicationParser`). |
 | `validation` | Reglas de validación (`Validator` y subclases) y `ValidationSchema`. |
-| `comparison` | Orquesta la comparación (`Comparator`) y calcula métricas (`ComplianceCalculator`, `ComplianceMetrics`, `ProductLineSummary`, `ComparisonCache`). |
+| `comparison` | Orquesta la comparación (`Comparator`) y calcula métricas (`ComplianceCalculator`, `ComplianceMetrics`, `ProductLineSummary`). |
 | `reporting` | Convierte resultados en `Report`/`ReportSection` y los escribe a Excel. |
 | `gui` | Ventana principal y paneles (carga de catálogo, carga de ACES, validación, estadísticas, auditoría, configuración). |
 | `tests` | Pruebas propias con `TestRunner` y `Assert` (sin JUnit). |
@@ -47,7 +47,7 @@ Launcher ──► gui ──► parsers ──► models
 - **`Attribute`** — nombre + `AttributeRequirement`. `isSatisfiedBy(valor)`:
   - si el atributo **no** es `Required` → siempre `true`;
   - si es `Required` → `false` cuando el valor es `null` o una cadena vacía/solo espacios.
-- **`AttributeRequirement`** — `REQUIRED`, `OPTIONAL`, `NOT_REQUIRED`. `fromCellValue()` interpreta el texto de la celda; cualquier valor desconocido o `null` cuenta como `NOT_REQUIRED`.
+- **`AttributeRequirement`** — `REQUIRED`, `OPTIONAL`, `NOT_REQUIRED`. `fromCellValue()` interpreta el texto de la celda **sin distinguir mayúsculas ni espacios en los extremos** (`required`, ` Optional `); un valor desconocido (por ejemplo `Req`) o `null` cuenta como `NOT_REQUIRED`. `isRecognized()` permite detectar esos valores desconocidos para avisar al usuario.
 - **`Application`** — metadatos (`make`, `model`, `year`, `product`, `partNumber`, `mfrLabel`, `position`) y un mapa `data` con los atributos técnicos (nombre de columna → valor). `getProductName()` devuelve `product`, que es el vínculo con el catálogo.
 - **`ValidationError`** — severidad (`ErrorSeverity`: `ERROR` / `WARNING`), código, mensaje, nombre de atributo y línea de producto.
 - **`ComparisonResult`** — resultado por aplicación: errores, advertencias, `totalAttributes`, `validAttributes`, `invalidAttributes`, `partNumber`, atributos opcionales y opcionales faltantes.
@@ -72,42 +72,43 @@ Todas las operaciones pesadas (leer Excel, comparar, exportar) corren en un `Swi
 ### 4.1 Carga del catálogo (`ExcelCatalogParser`)
 
 1. Se listan las hojas del archivo (`readSheetNames`) para que el usuario elija; por defecto `Product Line ACES Attributes`.
-2. Fila 1 = encabezados. Las columnas **0–3** son fijas (ID, nombre, y dos campos de categoría); desde la columna **4** cada encabezado es un atributo. Encabezados vacíos se omiten con aviso en `stderr`.
+2. Fila 1 = encabezados. Las columnas **0–3** son fijas (ID, nombre, y dos campos de categoría); desde la columna **4** cada encabezado es un atributo. Un encabezado vacío se omite con un aviso, **sin desplazar** las columnas siguientes (cada atributo conserva su columna original).
 3. Cada fila siguiente genera una `ProductLine`:
    - sin ID → se ignora la fila en silencio;
    - sin nombre → se omite con aviso;
-   - por cada atributo se crea un `Attribute` con el texto de la celda (celda vacía = `"Not Required"`).
+   - por cada atributo se crea un `Attribute` con el texto de la celda (celda vacía = `"Not Required"`); un valor que no es `Required`/`Optional`/`Not Required` genera un aviso.
 4. El nombre del `Catalog` es el nombre del archivo sin extensión.
+5. Los avisos de la lectura (columnas sin encabezado, filas omitidas, valores no reconocidos) quedan en `ExcelCatalogParser.getWarnings()` (máximo 50 detallados) y `CatalogLoadPanel` los muestra en pantalla.
 
 ### 4.2 Carga del archivo ACES (`ExcelApplicationParser`)
 
 1. Si no se indica hoja, se **autodetecta**: la primera hoja cuyo encabezado contenga `Make`, `Model`, `Year` y `Product`.
 2. En el encabezado, las columnas `Make/Model/Year/Product` (obligatorias) y `PartNumber/MfrLabel/Position` (opcionales) son **núcleo** (insensibles a mayúsculas). **Cualquier otra columna es un atributo técnico.** Si falta una obligatoria se lanza `ParseException`.
 3. **Optimización clave:** el panel le pasa al parser `catalog.getAllAttributeNames()` como `headersOfInterest`. Solo se leen las columnas de atributos que el catálogo conoce, y se guardan con el **nombre canónico del catálogo** (la coincidencia de nombres ignora mayúsculas). Esto reduce mucho la memoria en archivos de hasta 94 columnas × miles de filas.
-4. Por fila: si `Make` está vacío se omite (y se cuenta). Las celdas vacías se guardan como `null`.
+4. Por fila: si `Make` está vacío se omite y se cuenta (`getSkippedRowCount()`); `ApplicationLoadPanel` muestra ese número, porque esas aplicaciones no se auditan ni aparecen en el reporte. Las celdas vacías se guardan como `null`.
 
 > Por eso el catálogo debe cargarse **antes** que el archivo ACES.
 
-### 4.3 Validación (`Comparator` → `CompositeValidator` → `AttributeValidator`)
+### 4.3 Validación (`Comparator` → `AttributeValidator`)
 
 `ValidationPanel.startValidation()` llama a `comparator.compareAll(apps, catalog)` en segundo plano. Para un lote, `Comparator`:
 
 1. Construye un **índice** `nombre-de-línea-normalizado → ProductLine` y un **caché de `ValidationSchema`** por línea (se calculan una sola vez, no por aplicación).
-2. Por cada aplicación busca su línea (`product`, en minúsculas y sin espacios en los extremos) y ejecuta un `CompositeValidator` con un `AttributeValidator`.
+2. Por cada aplicación resuelve **una sola vez** su línea y su esquema en esos índices (`product`, en minúsculas y sin espacios en los extremos) y llama a `AttributeValidator.validateResolved(app, línea, esquema)`, sin volver a buscar en el catálogo. Si el catálogo tiene varias líneas con el mismo nombre, **gana la primera** (igual que `Catalog.findProductByName`, que usa `compare` para una sola aplicación).
 3. `AttributeValidator`:
    - **Línea no encontrada** → un `WARNING` con código `PRODUCT_LINE_NOT_FOUND` (la aplicación queda "sin clasificar") y termina.
    - Si se encuentra → `ValidationSchema` separa los atributos en requeridos y opcionales y se revisa cada requerido con `Attribute.isSatisfiedBy`. Cada faltante genera un `ERROR` con código `MISSING_REQUIRED_ATTRIBUTE`.
 4. Se arma el `ComparisonResult`:
    - `total` = nº de atributos requeridos de la línea;
-   - `invalid` = nº de errores `MISSING_REQUIRED_ATTRIBUTE`;
+   - `invalid` = nº de errores `MISSING_REQUIRED_ATTRIBUTE` (de la misma línea, así que `0 ≤ invalid ≤ total`);
    - `valid` = `total - invalid`;
    - lista de opcionales de la línea y cuáles faltan en la aplicación.
    - Sin línea → total/valid/invalid = 0.
 5. Se registra un `AuditReport` de tipo `COMPARISON` con duración y totales; el panel lo añade al historial.
 
-`CompositeValidator` ejecuta una lista de `Validator` y acumula errores; con `stopOnFirstCriticalError` se detiene en el primer `ERROR`.
+`CompositeValidator` ejecuta una lista de `Validator` y acumula errores; con `stopOnFirstCriticalError` se detiene en el primer `ERROR`. Hoy el `Comparator` ya no lo usa (solo hay un validador), por lo que `Comparator.setStopOnFirstCriticalError` se conserva por compatibilidad pero no tiene efecto.
 
-**Validadores disponibles pero no conectados al flujo actual** (el `Comparator` solo usa `AttributeValidator`): `EnumValidator` (valor dentro de una lista), `RangeValidator` (rango numérico; ignora valores no numéricos) y `DateFormatValidator`. Existen y tienen pruebas, y quedan listos para añadirse al `CompositeValidator`. Igualmente `ComparisonCache` (caché LRU con expiración por antigüedad) existe pero no se usa en el flujo de la GUI.
+**Validadores disponibles pero no conectados al flujo actual** (el `Comparator` solo usa `AttributeValidator`): `EnumValidator` (valor dentro de una lista), `RangeValidator` (rango numérico; ignora valores no numéricos) y `DateFormatValidator`. Existen y tienen pruebas (salvo `DateFormatValidator`), y son el punto de extensión para validar valores, no solo presencia. Conectarlos exige decidir dónde se declaran las reglas (el catálogo solo dice Required/Optional) y cambiaría la semántica del compliance.
 
 ### 4.4 Métricas (`ComplianceCalculator`)
 
@@ -133,6 +134,12 @@ Todas las operaciones pesadas (leer Excel, comparar, exportar) corren en un `Swi
 
 `writeReportToFile` lo escribe con `fastexcel`; `defaultReportFileFor(acesFile)` propone el nombre de salida a partir del archivo ACES. El export también corre en un `SwingWorker`.
 
+La escritura es **atómica**: se escribe a un `.tmp` del mismo directorio y luego reemplaza al destino, de modo que un fallo (o el archivo abierto en Excel) deja intacto un reporte existente. Antes de exportar, `ValidationPanel` rechaza elegir el archivo ACES cargado (`ExcelReportGenerator.isSameFile`) y pide confirmación si el destino ya existe.
+
+### 4.7 Coherencia del estado en la GUI
+
+Al cargar otro catálogo u otro ACES (o si la carga falla), `MainWindow` descarta los resultados de la auditoría anterior y avisa a sus oyentes (`addResultsInvalidatedListener`): `ValidationPanel` vuelve al estado inicial y `StatisticsPanel` muestra "Sin resultados". Así no se puede exportar un reporte que no corresponde a los archivos cargados.
+
 ---
 
 ## 5. Decisiones de diseño relevantes
@@ -148,6 +155,6 @@ Todas las operaciones pesadas (leer Excel, comparar, exportar) corren en un `Swi
 
 ## 6. Configuración y pruebas
 
-- `src/application.properties` define opciones de validación, caché, reporte, GUI, auditoría, logging, archivos y exportación. Varias están pensadas para uso futuro y la lógica actual no las lee todas; `ConfigDialog` es la pantalla de configuración de la GUI.
-- Pruebas en `tests/` (parsers, validadores, comparador, idempotencia, completitud del reporte, extremo a extremo, ida y vuelta de Excel), ejecutadas con `TestRunner`.
-- Compilar y ejecutar: `build compile`, `build jar`, `build run` (o `ant compile / jar / run`).
+- **Configuración**: la única fuente es el diálogo de Configuración (`ConfigDialog`), que guarda `~/.validador_aces_config.properties` con dos opciones: máximo de filas de la tabla de resultados (`maxTableRows`, por defecto 10 000) y directorio de exportación por defecto. No existe otro archivo de configuración.
+- Pruebas en `tests/` (parsers, validadores, comparador y su equivalencia `compare`/`compareAll`, idempotencia, completitud y escritura segura del reporte, extremo a extremo, ida y vuelta de Excel), ejecutadas con `TestRunner`. Las que usan los archivos reales (`catalogoDb/`, `ACES/`, no versionados) se **omiten** si faltan. Ver `src/com/validador/aces/tests/README.md`.
+- Compilar, probar y ejecutar: comandos verificados en `CLAUDE.md` (PowerShell y `ant compile / test / jar / run`; `build.bat <target>` también sirve).

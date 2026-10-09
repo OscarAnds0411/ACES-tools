@@ -1,89 +1,24 @@
 # Paquete: validation
 
-## Descripción
+Reglas que revisan una `Application` contra su línea de producto del catálogo.
 
-Contiene la lógica de validación de atributos ACES contra catálogos.
+| Clase | Rol | ¿Se usa en la aplicación? |
+|---|---|---|
+| `Validator` | Clase base abstracta: `validate(Application, Catalog)` → `List<ValidationError>` | — |
+| `AttributeValidator` | Detecta atributos **requeridos** ausentes o vacíos | **Sí** (lo usa `Comparator`) |
+| `ValidationSchema` | Separa los atributos de una línea en requeridos y opcionales | **Sí** |
+| `CompositeValidator` | Ejecuta varios `Validator` y acumula errores; `stopOnFirstCriticalError` | No (hoy solo hay un validador) |
+| `EnumValidator` | El valor de un atributo debe estar en una lista | No (solo pruebas) |
+| `RangeValidator` | El valor numérico de un atributo debe estar en un rango | No (solo pruebas) |
+| `DateFormatValidator` | El valor debe tener un formato de fecha | No (sin pruebas) |
 
-## Clases
+## `AttributeValidator`
 
-### TASK-013: AttributeValidator
-- **Descripción**: Validador base para atributos
-- **Métodos**: validate(), validateType(), validateRequired(), validateFormat()
-- **Retorna**: ValidationResult con errores y advertencias
-- **Estado**: [TODO]
+- `validate(app, catalog)`: busca la línea con `Catalog.findProductByName` y delega.
+- `validateResolved(app, línea, esquema)`: igual, con la línea y el esquema ya resueltos; es lo que usa `Comparator.compareAll` para no buscar en el catálogo por cada aplicación.
+- Línea no encontrada → un `WARNING` `PRODUCT_LINE_NOT_FOUND` ("sin clasificar"; no penaliza el compliance).
+- Atributo requerido faltante → un `ERROR` `MISSING_REQUIRED_ATTRIBUTE` por atributo. Un valor en blanco cuenta como ausente.
 
-### TASK-014: TypeValidator
-- **Descripción**: Validador especializado en tipos de datos
-- **Tipos soportados**: STRING, INTEGER, DECIMAL, BOOLEAN, DATE
-- **Métodos**: validateString(), validateInteger(), validateDecimal(), validateBoolean(), validateDate()
-- **Estado**: [TODO]
+## Agregar una regla
 
-### TASK-015: FormatValidator
-- **Descripción**: Validador de formatos y patrones
-- **Métodos**: validatePattern(), validateLength(), validateRange()
-- **Utiliza**: Expresiones regulares
-- **Estado**: [TODO]
-
-### TASK-016: RuleValidator
-- **Descripción**: Validador de reglas de negocio complejas
-- **Métodos**: evaluateRule(), evaluateExpression(), evaluateCondition()
-- **Estado**: [TODO]
-
-### TASK-017: CatalogValidator
-- **Descripción**: Validador de catálogos completos
-- **Métodos**: validateCatalog(), validateProductLines(), validateAttributes()
-- **Estado**: [TODO]
-
-### TASK-018: ApplicationValidator
-- **Descripción**: Validador de aplicaciones contra catálogos
-- **Métodos**: validateApplication(), validateAttributes(), generateReport()
-- **Estado**: [TODO]
-
-## Dependencias
-
-- Depende de: models (Attribute, ValidationResult, etc.)
-- Utiliza: commons-lang3 para validación de strings
-
-## Archivos Esperados
-
-```
-validation/
-├── AttributeValidator.java
-├── TypeValidator.java
-├── FormatValidator.java
-├── RuleValidator.java
-├── CatalogValidator.java
-├── ApplicationValidator.java
-└── README.md
-```
-
-## Tipos de Validación
-
-### Validación de Tipo
-- STRING: longitud, caracteres permitidos
-- INTEGER: rango, formato
-- DECIMAL: precisión, rango
-- BOOLEAN: valores verdadero/falso
-- DATE: formato ISO 8601, rango
-
-### Validación de Reglas
-- Campos requeridos
-- Valores permitidos (whitelist)
-- Patrones (regex)
-- Rangos numéricos
-- Formato de fechas
-- Dependencias entre campos
-
-### Validación de Catálogos
-- Estructura correcta
-- Líneas de producto válidas
-- Atributos únicos
-- Referencias válidas
-
-## Notas
-
-- Acumular todos los errores (no fallar en el primero)
-- Diferenciar entre errores y advertencias
-- Mensajes de error claros y útiles
-- Incluir información sobre qué validó correctamente
-- Performance: validar en paralelo cuando sea posible
+Subclase de `Validator` y agregarla a un `CompositeValidator`. Hoy `Comparator` no construye ese compuesto: conectar `Enum`/`Range`/`DateFormat` exige además decidir dónde se declaran las reglas (el catálogo solo dice Required/Optional) y cómo afectan al compliance. Ver `LOGICA_DEL_PROGRAMA.md` §4.3.

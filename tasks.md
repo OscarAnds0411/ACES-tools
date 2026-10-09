@@ -5,6 +5,17 @@
 Plan de implementacion para el Validador de Atributos ACES. Sistema Java de validacion y comparacion de atributos de productos contra catalogos maestros, con interfaz grafica y generacion de reportes en Excel.
 
 
+## Estado real (actualizado 2026-10-09)
+
+Este plan es historico: las casillas y criterios reflejan lo que se implemento en su momento. Diferencias con el codigo actual:
+
+- **Retiradas (Plan 007)**: `ComparisonCache` (TASK-021), `ReportPrinter` (TASK-024), `ExcelExporter` (TASK-025) y `ReportFilter` (TASK-026) se implementaron pero nunca se conectaron a la aplicacion, y se eliminaron del arbol (recuperables desde el historial de git).
+- **Implementadas pero no conectadas al `Comparator`**: `RangeValidator` (TASK-015), `EnumValidator` (TASK-016) y `DateFormatValidator` (TASK-018). Tienen pruebas; el `Comparator` solo ejecuta `AttributeValidator`.
+- **`manifest.txt` (TASK-052)**: se elimino; `build.xml` genera el manifest y su `Class-Path` desde `lib/*.jar`.
+- **Configuracion**: `src/application.properties` se elimino porque ningun codigo lo leia. La unica configuracion real es el dialogo de Configuracion (`~/.validador_aces_config.properties`).
+- **Pruebas (TASK-035 a TASK-047)**: el proyecto usa un ejecutor propio (`TestRunner`), no JUnit. Ver `src/com/validador/aces/tests/README.md`.
+- **Pendientes**: TASK-048, TASK-049 y TASK-050 (documentacion).
+
 ## Tasks
 
 ### Componente 1: MODELOS DE DATOS
@@ -265,7 +276,7 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Complejidad: 2
   - Prioridad: required
 
-- [x] 21. Implementar `ComparisonCache` (TASK-021)
+- [x] 21. Implementar `ComparisonCache` (TASK-021) — *implementada y retirada (Plan 007): nunca se integro al flujo*
   - Estado: COMPLETADO
   - Descripcion: Cache para resultados de comparacion previos
   - Criterios de Aceptacion:
@@ -309,7 +320,7 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Complejidad: 4
   - Prioridad: required
 
-- [x] 24. Implementar `ReportPrinter` (TASK-024)
+- [x] 24. Implementar `ReportPrinter` (TASK-024) — *implementada y retirada (Plan 007): nunca se integro al flujo*
   - Estado: COMPLETADO
   - Descripcion: Generar representacion textual de reporte para consola
   - Criterios de Aceptacion:
@@ -322,7 +333,7 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Complejidad: 2
   - Prioridad: optional
 
-- [x] 25. Implementar `ExcelExporter` (TASK-025)
+- [x] 25. Implementar `ExcelExporter` (TASK-025) — *implementada y retirada (Plan 007): nunca se integro al flujo*
   - Estado: COMPLETADO
   - Descripcion: Exportar resultados a archivo Excel independiente por aplicacion
   - Criterios de Aceptacion:
@@ -335,7 +346,7 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Complejidad: 3
   - Prioridad: optional
 
-- [x] 26. Implementar `ReportFilter` (TASK-026)
+- [x] 26. Implementar `ReportFilter` (TASK-026) — *implementada y retirada (Plan 007): nunca se integro al flujo*
   - Estado: COMPLETADO
   - Descripcion: Filtrar resultados de comparacion segun criterios, devolviendo nueva instancia
   - Criterios de Aceptacion:
@@ -429,7 +440,7 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
     - ✅ JFileChooser con filtro .xlsx en chooseExcelOpen() y chooseExcelSave()
     - ✅ Recordar ultimo directorio: campo estatico lastDir compartido entre todas las invocaciones de la app
     - ✅ chooseExcelSave() agrega .xlsx automaticamente si falta; acepta sugerencia de nombre por defecto
-    - ✅ Usado internamente por AuditPanel y ValidationPanel (exportacion); CatalogLoadPanel y ApplicationLoadPanel migrables en refactor futuro
+    - ✅ Hoy solo lo usa AuditPanel (exportar historial); ValidationPanel, CatalogLoadPanel y ApplicationLoadPanel crean su propio JFileChooser (migrables a este helper en un refactor futuro)
   - Dependencias: TASK-027
   - Complejidad: 1
   - Prioridad: required
@@ -440,7 +451,7 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
   - Criterios de Aceptacion:
     - ✅ JDialog modal con opciones: maximo de filas en tabla (spinner 1000-50000) y directorio de exportacion por defecto
     - ✅ Guardar en ~/.validador_aces_config.properties via java.util.Properties
-    - ✅ Metodos estaticos ConfigDialog.getMaxTableRows() y getDefaultExportDir() para leer desde cualquier componente
+    - ✅ Metodos estaticos ConfigDialog.getMaxTableRows() y getDefaultExportDir() para leer desde cualquier componente (ValidationPanel aplica getMaxTableRows() desde el Plan 008; antes lo ignoraba y fijaba 10 000 filas)
     - ✅ Accesible desde boton '⚙' en la barra de titulo de MainWindow
   - Dependencias: TASK-027
   - Complejidad: 2
@@ -885,10 +896,10 @@ Plan de implementacion para el Validador de Atributos ACES. Sistema Java de vali
 ## Notes
 
 - **Orden de ejecucion recomendado**: Seguir el orden 1 a 54 respetando dependencias
-- **Ajuste post Componente 1**: Los modelos fueron ajustados a la estructura real de los archivos Excel (ver XLSX_STRUCTURE_ANALYSIS.md)
+- **Ajuste post Componente 1**: Los modelos fueron ajustados a la estructura real de los archivos Excel (ver archive/XLSX_STRUCTURE_ANALYSIS.md)
 - **Testing**: Tasks 35-47 pueden ejecutarse en paralelo con componentes correspondientes
 - **Build**: Tasks 51-54 solo despues de que todo compila sin errores
 
 
 **Version**: 1.0
-**Estado**: En Progreso (47/54 tareas completadas - 87%)
+**Estado**: En Progreso (51/54 tareas completadas - 94%; pendientes: TASK-048, TASK-049 y TASK-050, todas de documentacion)

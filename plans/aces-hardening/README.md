@@ -38,7 +38,7 @@ is available (`C:\opt\ant\bin\ant.bat`).
 | [006](006-invalidate-stale-results.md) | Invalidate results when inputs change | S–M | 005 | DONE |
 | [007](007-remove-dead-code.md) | Remove uncalled production code | S | 001, 004 | DONE |
 | [008](008-single-config-source.md) | One config source; `maxTableRows` works | S | 006 | DONE |
-| [009](009-docs-consolidation.md) | Docs match the project; archive history | M | 002, 007, 008 | TODO |
+| [009](009-docs-consolidation.md) | Docs match the project; archive history | M | 002, 007, 008 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) |
 SUPERSEDED (one-line pointer to what replaced it)
@@ -63,6 +63,16 @@ SUPERSEDED (one-line pointer to what replaced it)
 
 (Newest first. A few lines per entry, hard cap.)
 
+- **2026-10-09**: Plan 009 closed (working tree, not committed) — all 9 plans
+  done. Deviations: package READMEs (comparison/reporting/validation/parsers/gui)
+  and `tests/README.md` were not just stale but described classes that never
+  existed (all `[TODO]`) → rewritten, not patched; `EXCEL_FORMAT_GUIDE.md`
+  archived (describes sheets "Catalog/ProductLines" that don't match the real
+  file); `models/README.md` spot-checked only (enums match code), left as is.
+  Remaining stale-term hits outside `archive/`/`plans/` are intentional
+  negations or annotated history in `tasks.md`. Out of scope and still stale:
+  `.kiro/specs/.../design.md`. All README commands run as written, incl.
+  `java -jar dist/validador-aces.jar`. 13 docs moved with `git mv`; none deleted.
 - **2026-10-09**: Plans 007 + 008 closed (working tree, not committed). 007:
   six files + `utils/` deleted (all tracked and unmodified → recoverable with
   `git checkout -- <path>`), clean compile, suite unchanged at 120. 008:
