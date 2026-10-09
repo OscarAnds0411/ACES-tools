@@ -68,6 +68,9 @@ public class TestRunner {
         runSuite("[TASK-047] ReportCompletenessTest", ReportCompletenessTest.class);
         runSuite("ProductLineSummaryTest", ProductLineSummaryTest.class);
 
+        // Plan 003: regresiones de los parsers
+        runSuite("[PLAN-003] ParserRegressionTest", ParserRegressionTest.class);
+
         // Resumen final
         System.out.println();
         System.out.println(sep);

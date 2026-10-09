@@ -58,6 +58,7 @@ public class ApplicationLoadPanel extends JPanel {
     private final JLabel lblResultTitle;
     private final JLabel lblApps;
     private final JLabel lblSheet;
+    private final JLabel lblSkipped;
 
     private static final int ROW_H = MainWindow.px(32);
 
@@ -81,6 +82,7 @@ public class ApplicationLoadPanel extends JPanel {
         lblResultTitle = new JLabel();
         lblApps        = new JLabel();
         lblSheet       = new JLabel();
+        lblSkipped     = new JLabel();
         resultCard     = buildResultCard();
         resultCard.setVisible(false);
 
@@ -222,6 +224,8 @@ public class ApplicationLoadPanel extends JPanel {
         statsGrid.add(lblSheet);
         statsGrid.add(statLabel("Aplicaciones cargadas"));
         statsGrid.add(lblApps);
+        statsGrid.add(statLabel("Filas omitidas (sin Make)"));
+        statsGrid.add(lblSkipped);
 
         JButton btnCont = solidBtn("Ejecutar auditoría  →",
                 MainWindow.FLUSH_ORANGE, MainWindow.CHELSEA_GEM);
@@ -452,12 +456,14 @@ public class ApplicationLoadPanel extends JPanel {
         final File   file  = selectedFile;
         final String sheet = selectedSheet;
 
+        // El parser se crea aquí para leer cuántas filas descartó al terminar la carga
+        final ExcelApplicationParser parser = new ExcelApplicationParser();
         new SwingWorker<List<Application>, Void>() {
             @Override protected List<Application> doInBackground() throws Exception {
                 // Solo se leen las columnas que coinciden con los atributos del catálogo cargado
                 com.validador.aces.models.Catalog catalog = window.getLoadedCatalog();
                 java.util.Set<String> interest = catalog != null ? catalog.getAllAttributeNames() : null;
-                return new ExcelApplicationParser().parse(file, sheet, interest);
+                return parser.parse(file, sheet, interest);
             }
             @Override protected void done() {
                 try {
@@ -465,8 +471,12 @@ public class ApplicationLoadPanel extends JPanel {
                     window.setLoadedAcesFile(file);
                     window.setLoadedApplications(apps);
                     showSuccess(apps, sheet);
+                    showSkippedRows(parser.getSkippedRowCount());
                     window.setStatus(
-                        "✔  ACES cargado — " + fmt(apps.size()) + " aplicaciones.",
+                        "✔  ACES cargado — " + fmt(apps.size()) + " aplicaciones."
+                            + (parser.getSkippedRowCount() > 0
+                                ? "  ⚠ " + fmt(parser.getSkippedRowCount()) + " filas omitidas (sin Make)."
+                                : ""),
                         MainWindow.C_OK);
                 } catch (ExecutionException ex) {
                     Throwable cause = ex.getCause();
@@ -503,6 +513,22 @@ public class ApplicationLoadPanel extends JPanel {
 
         resultCard.setVisible(true);
         revalidate(); repaint();
+    }
+
+    /**
+     * Informa de las filas que el parser descartó por no tener Make: esas
+     * aplicaciones no se validan ni aparecen en el reporte, así que el usuario
+     * debe poder verlo (antes solo se escribía en la consola).
+     */
+    private void showSkippedRows(int skipped) {
+        lblSkipped.setFont(MainWindow.font(Font.BOLD, 12));
+        if (skipped == 0) {
+            lblSkipped.setText("Ninguna");
+            lblSkipped.setForeground(MainWindow.FLUSH_ORANGE);
+        } else {
+            lblSkipped.setText(fmt(skipped) + " (no se auditan)");
+            lblSkipped.setForeground(MainWindow.C_ERROR);
+        }
     }
 
     private static String fmt(int n) {

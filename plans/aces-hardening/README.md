@@ -31,8 +31,8 @@ is available (`C:\opt\ant\bin\ant.bat`).
 | Plan | Title | Effort | Depends on | Status |
 |------|-------|--------|------------|--------|
 | [001](001-reliable-test-gate.md) | Make the test suite a reliable gate | S–M | — | DONE |
-| [002](002-clone-buildable-and-claude-md.md) | Fresh clone builds; `CLAUDE.md` with verified commands | S | 001 | TODO |
-| [003](003-parser-correctness.md) | Parsers read catalog/ACES faithfully | M | 001 | TODO |
+| [002](002-clone-buildable-and-claude-md.md) | Fresh clone builds; `CLAUDE.md` with verified commands | S | 001 | DONE |
+| [003](003-parser-correctness.md) | Parsers read catalog/ACES faithfully | M | 001 | DONE |
 | [004](004-comparator-single-path.md) | Resolve product line once; fix duplicate-name divergence | M | 001 (run after 003) | TODO |
 | [005](005-safe-report-export.md) | Safe export: confirm overwrite, protect ACES, atomic write | S–M | 001 | TODO |
 | [006](006-invalidate-stale-results.md) | Invalidate results when inputs change | S–M | 005 | TODO |
@@ -63,6 +63,21 @@ SUPERSEDED (one-line pointer to what replaced it)
 
 (Newest first. A few lines per entry, hard cap.)
 
+- **2026-10-09**: Plan 003 closed (working tree, not committed). 7 regression
+  tests (plan asked ≥4), seen failing before the fix (shift reproduced: `C` read
+  REQUIRED instead of OPTIONAL); suite 95 → 102, all pass. Real catalog
+  unchanged by the fix (38 265 lines, 12 984 REQUIRED, identical checksum vs
+  HEAD) and 0 parser warnings on it → no compliance shift expected from 003
+  on the real catalog. GUI smoke (steps 5) NOT operated by the executor: app
+  starts, fixtures in `%TEMP%\aces-smoke\` (`catalogo_smoke.xlsx`,
+  `aces_smoke.xlsx`) for the owner to click through. Next: 004.
+- **2026-10-09**: Plan 002 closed (working tree, not committed). Deviations:
+  `fastexcel`/`fastexcel-reader` license not declared in the jars → marked
+  "sin verificar" in `lib/README.md` (owner to confirm upstream before
+  redistributing); `README.md:79` and `IMPLEMENTATION_GUIDE.md:213` still tell
+  users to use the deleted `manifest.txt` (fixed by Plan 009); `!manifest.txt`
+  line left in `.gitignore`. `ant clean jar` + `ant test` verified (Ant 1.10.18).
+  Next: 003.
 - **2026-10-09**: Plan 001 closed (changes in working tree, not committed).
   Deviations: 19 real-data tests guarded (plan estimated ~15); fresh-clone
   simulation = 76 passed / 19 skipped / 0 failed; negative checks (failing test,

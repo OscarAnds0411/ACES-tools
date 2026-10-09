@@ -264,6 +264,8 @@ local-notes/
 
 # No ignorar esto (lib/ tiene dependencias)
 !lib/
+# git no re-incluye los .jar por la regla *.jar de arriba: excepcion explicita
+!lib/*.jar
 
 # No ignorar manifests de proyecto (pero sí los generados)
 !manifest.txt

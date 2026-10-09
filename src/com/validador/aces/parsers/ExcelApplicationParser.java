@@ -68,6 +68,20 @@ public class ExcelApplicationParser extends ApplicationParser {
 
     // ── Implementación de ApplicationParser ───────────────────────────────
 
+    /** Filas de datos descartadas en la última lectura por tener {@code Make} vacío. */
+    private int skippedRowCount;
+
+    /**
+     * Filas de datos que la última llamada a {@code parse} descartó por no tener
+     * {@code Make}. Esas aplicaciones no se validan ni aparecen en el reporte, por
+     * lo que la GUI debe mostrarlo. Se reinicia en cada {@code parse}.
+     *
+     * @return número de filas descartadas (0 si no hubo ninguna)
+     */
+    public int getSkippedRowCount() {
+        return skippedRowCount;
+    }
+
     /** Parsea usando la hoja {@link #DEFAULT_SHEET_NAME} y todas las columnas de atributos. */
     @Override
     public List<Application> parse(File file) throws ParseException {
@@ -92,6 +106,7 @@ public class ExcelApplicationParser extends ApplicationParser {
     public List<Application> parse(File file, String sheetName, Set<String> headersOfInterest)
             throws ParseException {
         validateFileExists(file);
+        skippedRowCount = 0;
 
         try (ReadableWorkbook workbook = new ReadableWorkbook(file)) {
             String targetSheet = sheetName;
@@ -204,6 +219,7 @@ public class ExcelApplicationParser extends ApplicationParser {
             Application app = buildApplication(rows.next(), columns, attributeColumns);
             if (app != null) applications.add(app); else skipped++;
         }
+        skippedRowCount = skipped;
         if (skipped > 0) {
             System.err.println("ExcelApplicationParser: " + skipped + " filas omitidas (Make vacío).");
         }

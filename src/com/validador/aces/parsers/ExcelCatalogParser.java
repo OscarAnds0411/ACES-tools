@@ -13,6 +13,7 @@ import org.dhatim.fastexcel.reader.Row;
 import org.dhatim.fastexcel.reader.Sheet;
 
 import com.validador.aces.models.Attribute;
+import com.validador.aces.models.AttributeRequirement;
 import com.validador.aces.models.Catalog;
 import com.validador.aces.models.ProductLine;
 
@@ -66,6 +67,38 @@ public class ExcelCatalogParser extends CatalogParser {
 
     // ── Implementación de CatalogParser ───────────────────────────────────
 
+    // ── Avisos de la última lectura ───────────────────────────────────────
+
+    /** Máximo de avisos detallados que se conservan; el resto solo se cuenta. */
+    private static final int MAX_WARNINGS = 50;
+
+    private final List<String> warnings = new ArrayList<>();
+    private int suppressedWarnings;
+
+    /**
+     * Avisos generados por la última llamada a {@code parse}: columnas sin
+     * encabezado, filas omitidas y valores de requisito no reconocidos (que se
+     * tratan como "Not Required"). Se reinicia en cada {@code parse}. Si hay más
+     * de {@value #MAX_WARNINGS}, el último elemento resume cuántos se omitieron.
+     *
+     * @return lista inmutable, vacía si la lectura no tuvo incidencias
+     */
+    public List<String> getWarnings() {
+        List<String> all = new ArrayList<>(warnings);
+        if (suppressedWarnings > 0) {
+            all.add("… y " + suppressedWarnings + " avisos más.");
+        }
+        return java.util.Collections.unmodifiableList(all);
+    }
+
+    private void addWarning(String message) {
+        if (warnings.size() < MAX_WARNINGS) {
+            warnings.add(message);
+        } else {
+            suppressedWarnings++;
+        }
+    }
+
     /**
      * Parsea el catálogo usando la hoja {@link #DEFAULT_SHEET_NAME}.
      */
@@ -85,6 +118,8 @@ public class ExcelCatalogParser extends CatalogParser {
      */
     public Catalog parse(File file, String sheetName) throws ParseException {
         validateFileExists(file);
+        warnings.clear();
+        suppressedWarnings = 0;
         String target = (sheetName != null && !sheetName.trim().isEmpty())
                 ? sheetName : DEFAULT_SHEET_NAME;
 
@@ -118,35 +153,63 @@ public class ExcelCatalogParser extends CatalogParser {
         if (!rows.hasNext()) return;
 
         Row headerRow = rows.next();
-        List<String> attributeHeaders = readAttributeHeaders(headerRow);
+        List<AttributeColumn> attributeColumns = readAttributeHeaders(headerRow);
 
         while (rows.hasNext()) {
-            ProductLine pl = buildProductLine(rows.next(), attributeHeaders);
+            ProductLine pl = buildProductLine(rows.next(), attributeColumns);
             if (pl != null) catalog.addProductLine(pl);
         }
     }
 
-    private List<String> readAttributeHeaders(Row headerRow) {
-        List<String> headers = new ArrayList<>();
+    /**
+     * Un atributo del catálogo: nombre del encabezado y su columna ORIGINAL en la
+     * hoja. Se guarda la columna porque los encabezados vacíos se omiten y, si se
+     * usara la posición en la lista, todas las columnas siguientes quedarían
+     * desplazadas (cada atributo leería el requisito de otro).
+     */
+    private static final class AttributeColumn {
+        final int index;
+        final String name;
+
+        AttributeColumn(int index, String name) {
+            this.index = index;
+            this.name = name;
+        }
+    }
+
+    private List<AttributeColumn> readAttributeHeaders(Row headerRow) {
+        List<AttributeColumn> columns = new ArrayList<>();
         int cellCount = headerRow.getCellCount();
         for (int i = FIRST_ATTRIBUTE_COLUMN; i < cellCount; i++) {
             String header = headerRow.getCellAsString(i).orElse(null);
             if (header == null || header.trim().isEmpty()) {
                 System.err.println("ExcelCatalogParser: encabezado vacío en columna " + i + ", se omite.");
+                addWarning("Encabezado vacío en la columna " + columnLetter(i)
+                    + "; se omite esa columna.");
                 continue;
             }
-            headers.add(header);
+            columns.add(new AttributeColumn(i, header));
         }
-        return headers;
+        return columns;
     }
 
-    private ProductLine buildProductLine(Row row, List<String> attributeHeaders) {
+    /** Letra de columna estilo Excel para un índice 0-based (0 → A, 5 → F, 26 → AA). */
+    private static String columnLetter(int index) {
+        StringBuilder sb = new StringBuilder();
+        for (int n = index + 1; n > 0; n = (n - 1) / 26) {
+            sb.insert(0, (char) ('A' + (n - 1) % 26));
+        }
+        return sb.toString();
+    }
+
+    private ProductLine buildProductLine(Row row, List<AttributeColumn> attributeColumns) {
         String productId = row.getCellText(0);
         if (productId == null || productId.trim().isEmpty()) return null;
 
         String name = row.getCellAsString(1).orElse(null);
         if (name == null || name.trim().isEmpty()) {
             System.err.println("ExcelCatalogParser: fila con ID '" + productId + "' sin nombre, omitida.");
+            addWarning("Fila con ID '" + productId.trim() + "' sin nombre; se omite.");
             return null;
         }
 
@@ -157,10 +220,14 @@ public class ExcelCatalogParser extends CatalogParser {
             null
         );
 
-        for (int i = 0; i < attributeHeaders.size(); i++) {
-            String headerName = attributeHeaders.get(i);
-            String cellValue  = row.getCellAsString(FIRST_ATTRIBUTE_COLUMN + i).orElse("Not Required");
-            pl.addAttribute(new Attribute(headerName, headerName, cellValue));
+        for (AttributeColumn column : attributeColumns) {
+            String cellValue = row.getCellAsString(column.index).orElse("Not Required");
+            if (!AttributeRequirement.isRecognized(cellValue)) {
+                addWarning("Línea '" + name.trim() + "': valor '" + cellValue.trim()
+                    + "' no reconocido en el atributo '" + column.name
+                    + "' (se trata como Not Required).");
+            }
+            pl.addAttribute(new Attribute(column.name, column.name, cellValue));
         }
         return pl;
     }

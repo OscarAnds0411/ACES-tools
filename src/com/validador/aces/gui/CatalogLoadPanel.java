@@ -24,6 +24,8 @@ import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -69,6 +71,7 @@ public class CatalogLoadPanel extends JPanel {
     private final JLabel  lblLines;
     private final JLabel  lblAttrs;
     private final JLabel  lblSheet;
+    private final JLabel  lblWarnings;
 
     // Altura uniforme para todos los controles de entrada
     private static final int ROW_H = MainWindow.px(32);
@@ -96,6 +99,7 @@ public class CatalogLoadPanel extends JPanel {
         lblLines       = new JLabel();
         lblAttrs       = new JLabel();
         lblSheet       = new JLabel();
+        lblWarnings    = new JLabel();
         resultCard     = buildResultCard();
         resultCard.setVisible(false);
 
@@ -255,6 +259,8 @@ public class CatalogLoadPanel extends JPanel {
         statsGrid.add(lblLines);
         statsGrid.add(statLabel("Atributos por línea (aprox.)"));
         statsGrid.add(lblAttrs);
+        statsGrid.add(statLabel("Avisos de lectura"));
+        statsGrid.add(lblWarnings);
 
         JButton btnCont = solidBtn("  Continuar: Cargar ACES  →",
                 MainWindow.SCI_BLUE, MainWindow.MALIBU);
@@ -487,10 +493,12 @@ public class CatalogLoadPanel extends JPanel {
         final File   file  = selectedFile;
         final String sheet = selectedSheet;
 
+        // El parser se crea aquí para leer sus avisos al terminar la carga
+        final ExcelCatalogParser parser = new ExcelCatalogParser();
         new SwingWorker<Catalog, Void>() {
             @Override
             protected Catalog doInBackground() throws Exception {
-                return new ExcelCatalogParser().parse(file, sheet);
+                return parser.parse(file, sheet);
             }
 
             @Override
@@ -499,6 +507,7 @@ public class CatalogLoadPanel extends JPanel {
                     Catalog catalog = get();
                     window.setLoadedCatalog(catalog);
                     showSuccess(catalog, sheet);
+                    showWarnings(parser.getWarnings());
                     window.setStatus(
                         "✔  Catálogo cargado — "
                             + fmt(catalog.getProductLineCount())
@@ -551,6 +560,36 @@ public class CatalogLoadPanel extends JPanel {
         resultCard.setVisible(true);
         revalidate();
         repaint();
+    }
+
+    /**
+     * Muestra los avisos del parser en la tarjeta de resultado y, si los hay, el
+     * detalle en un diálogo: un requisito desconocido o una columna sin encabezado
+     * cambian el cálculo de cumplimiento y no deben pasar desapercibidos.
+     */
+    private void showWarnings(List<String> warnings) {
+        lblWarnings.setFont(MainWindow.font(Font.BOLD, 12));
+        if (warnings.isEmpty()) {
+            lblWarnings.setText("Ninguno");
+            lblWarnings.setForeground(MainWindow.SCI_BLUE);
+            lblWarnings.setToolTipText(null);
+            return;
+        }
+
+        String detail = String.join("\n", warnings);
+        lblWarnings.setText(warnings.size() + " (ver detalle)");
+        lblWarnings.setForeground(MainWindow.C_ERROR);
+        lblWarnings.setToolTipText("<html>"
+            + detail.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")
+            + "</html>");
+
+        JTextArea area = new JTextArea(detail, 12, 60);
+        area.setEditable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        JOptionPane.showMessageDialog(window, new JScrollPane(area),
+            "Avisos al leer el catálogo (" + warnings.size() + ")",
+            JOptionPane.WARNING_MESSAGE);
     }
 
     private static String fmt(int n) {

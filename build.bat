@@ -4,7 +4,13 @@ REM Uso: build compile, build jar, build run, etc.
 
 setlocal enabledelayedexpansion
 
-set "ANT_BIN=C:\opt\ant\bin\ant.bat"
+REM Buscar Ant: 1) ANT_HOME, 2) PATH, 3) ubicacion historica C:\opt\ant
+set "ANT_BIN="
+if defined ANT_HOME if exist "%ANT_HOME%\bin\ant.bat" set "ANT_BIN=%ANT_HOME%\bin\ant.bat"
+if not defined ANT_BIN (
+    for /f "delims=" %%A in ('where ant.bat 2^>nul') do if not defined ANT_BIN set "ANT_BIN=%%A"
+)
+if not defined ANT_BIN if exist "C:\opt\ant\bin\ant.bat" set "ANT_BIN=C:\opt\ant\bin\ant.bat"
 set "PROJECT_ROOT=%~dp0"
 set "TARGET=%1"
 
@@ -39,9 +45,9 @@ if "%TARGET%"=="help" (
     goto :end
 )
 
-if not exist "%ANT_BIN%" (
-    echo Error: Apache Ant no encontrado en %ANT_BIN%
-    echo Por favor instala Apache Ant
+if not defined ANT_BIN (
+    echo Error: Apache Ant no encontrado.
+    echo Busque en ANT_HOME, en el PATH y en C:\opt\ant. Instale Apache Ant o defina ANT_HOME.
     exit /b 1
 )
 
